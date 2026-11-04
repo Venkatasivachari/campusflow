@@ -147,8 +147,9 @@ class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login/**", "/api/auth/refresh", "/api/auth/forgot-password/**").permitAll()
                 .requestMatchers("/api/auth/set-initial-password", "/api/auth/change-password", "/api/auth/logout", "/api/auth/me").authenticated()
-                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "ACADEMIC_ADMIN", "ACCOUNTS", "EXAM_CELL")
-                .requestMatchers("/api/faculty/**").hasAnyRole("FACULTY", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/owner/**").hasAnyRole("OWNER", "SUPER_ADMIN")
+                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "OWNER", "PRINCIPAL", "DEAN", "ACADEMIC_ADMIN", "ACCOUNTS", "EXAM_CELL")
+                .requestMatchers("/api/faculty/**").hasAnyRole("FACULTY", "ADMIN", "SUPER_ADMIN", "OWNER", "HOD")
                 .requestMatchers("/api/student/**").hasRole("STUDENT")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

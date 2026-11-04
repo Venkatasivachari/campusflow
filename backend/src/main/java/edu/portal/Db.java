@@ -62,6 +62,17 @@ public class Db {
         return id;
     }
 
+    public void logAudit(Long userId, String action, String entityName, String entityId, String details, String ipAddress) {
+        try {
+            jdbc.update("INSERT INTO audit_logs (user_id, action, entity_name, entity_id, details, ip_address) VALUES (?,?,?,?,?,?)",
+                    userId, action, entityName, entityId, details, ipAddress == null ? "127.0.0.1" : ipAddress);
+        } catch (Exception ignored) {
+            try {
+                audit(userId, action, entityName, entityId, null, details, ipAddress);
+            } catch (Exception ignored2) {}
+        }
+    }
+
     public void audit(Long userId, String action, String entityName, String entityId, String oldValue, String newValue, String ipAddress) {
         jdbc.update("INSERT INTO audit_log (user_id, action, entity_name, entity_id, old_value, new_value, ip_address) VALUES (?,?,?,?,?,?,?)",
                 userId, action, entityName, entityId, oldValue, newValue, ipAddress == null ? "127.0.0.1" : ipAddress);

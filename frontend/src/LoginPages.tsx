@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GraduationCap, Eye, EyeOff, ShieldCheck, BookOpen, Users, Lock, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { GraduationCap, Eye, EyeOff, ShieldCheck, BookOpen, Users, Lock, ArrowRight, CheckCircle, AlertCircle, Crown } from "lucide-react";
 import { api, saveAuth } from "./api";
 
 interface LoginProps {
-  role: "ADMIN" | "FACULTY" | "STUDENT";
+  role: "OWNER" | "ADMIN" | "FACULTY" | "STUDENT";
 }
 
 export function LoginPage({ role }: LoginProps) {
@@ -30,6 +30,19 @@ export function LoginPage({ role }: LoginProps) {
   const [forgotMsg, setForgotMsg] = useState<string | null>(null);
 
   const configs = {
+    OWNER: {
+      headline: "Institutional Command Center",
+      subhead: "Supreme executive authority over institutional governance, board administration, historical analytics 2015-2026, and enterprise security.",
+      accent: "#312E81",
+      accentBg: "bg-indigo-900 hover:bg-indigo-950 border border-indigo-500/30",
+      accentText: "text-indigo-400",
+      gradient: "from-[#030712] via-[#0B1020] to-[#1E1B4B]",
+      icon: Crown,
+      portalName: "Root Owner & Chancellor",
+      idPlaceholder: "OWN0001 or owner@college.local",
+      apiCall: api.loginOwner,
+      redirect: "/owner",
+    },
     ADMIN: {
       headline: "Institutional Management Portal",
       subhead: "Administrative control center for academic records, payroll, students, and regulatory compliance.",
@@ -183,6 +196,7 @@ export function LoginPage({ role }: LoginProps) {
         <div className="relative z-10 flex items-center justify-between text-xs text-white/60 border-t border-white/10 pt-4 font-mono">
           <span>SECURE AUTH 256-BIT</span>
           <div className="flex gap-4">
+            <button onClick={() => navigate("/owner/login")} className="hover:text-white transition">Owner</button>
             <button onClick={() => navigate("/admin/login")} className="hover:text-white transition">Admin</button>
             <button onClick={() => navigate("/faculty/login")} className="hover:text-white transition">Faculty</button>
             <button onClick={() => navigate("/student/login")} className="hover:text-white transition">Student</button>
@@ -263,7 +277,9 @@ export function LoginPage({ role }: LoginProps) {
 
           <div className="mt-6 pt-5 border-t border-[#E5E8F0] dark:border-[#1F293D] text-center text-xs text-[#64708A]">
             <span>Need another experience? </span>
-            <div className="flex justify-center gap-3 mt-2">
+            <div className="flex flex-wrap justify-center gap-3 mt-2">
+              <button onClick={() => navigate("/owner/login")} className="hover:underline font-semibold text-amber-500">Owner</button>
+              <span>•</span>
               <button onClick={() => navigate("/admin/login")} className="hover:underline font-medium text-indigo-600">Admin</button>
               <span>•</span>
               <button onClick={() => navigate("/faculty/login")} className="hover:underline font-medium text-teal-600">Faculty</button>

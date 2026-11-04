@@ -44,7 +44,8 @@ export async function apiReq<T = any>(url: string, opts: RequestInit = {}): Prom
     const role = auth?.role?.toLowerCase();
     clearAuth();
     if (!window.location.pathname.includes("/login")) {
-      if (role === "student") window.location.href = "/student/login";
+      if (role === "owner" || role === "super_admin") window.location.href = "/owner/login";
+      else if (role === "student") window.location.href = "/student/login";
       else if (role === "faculty") window.location.href = "/faculty/login";
       else window.location.href = "/admin/login";
     }
@@ -93,6 +94,7 @@ export async function downloadBlob(url: string, filename: string): Promise<void>
 
 export const api = {
   // Auth
+  loginOwner: (req: any) => apiReq("/auth/login/owner", { method: "POST", body: JSON.stringify(req) }),
   loginAdmin: (req: any) => apiReq("/auth/login/admin", { method: "POST", body: JSON.stringify(req) }),
   loginFaculty: (req: any) => apiReq("/auth/login/faculty", { method: "POST", body: JSON.stringify(req) }),
   loginStudent: (req: any) => apiReq("/auth/login/student", { method: "POST", body: JSON.stringify(req) }),
@@ -109,6 +111,17 @@ export const api = {
     getMyNotifications: () => apiReq("/notifications"),
     markRead: (id: number) => apiReq(`/notifications/${id}/mark-read`, { method: "POST" }),
     markAllRead: () => apiReq("/notifications/mark-all-read", { method: "POST" }),
+  },
+
+  // Owner APIs
+  owner: {
+    getOverview: () => apiReq("/owner/overview"),
+    getHistoricalAnalytics: (year?: number) => apiReq(`/owner/historical-analytics${year ? `?year=${year}` : ""}`),
+    getDepartments: () => apiReq("/owner/departments"),
+    getAdmins: () => apiReq("/owner/admins"),
+    createAdmin: (req: any) => apiReq("/owner/admins", { method: "POST", body: JSON.stringify(req) }),
+    getFinancialSummary: () => apiReq("/owner/financial-summary"),
+    getAuditLogs: (limit?: number) => apiReq(`/owner/audit-logs${limit ? `?limit=${limit}` : ""}`),
   },
 
   // Admin APIs

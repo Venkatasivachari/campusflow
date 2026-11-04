@@ -43,6 +43,11 @@ public class AuthController {
     public record ForgotReq(String identifier) {}
     public record ResetReq(String identifier, String otp, String newPassword) {}
 
+    @PostMapping("/login/owner")
+    public LoginRes loginOwner(@RequestBody LoginReq req, HttpServletRequest httpReq) {
+        return handleLogin(req, "OWNER", httpReq);
+    }
+
     @PostMapping("/login/admin")
     public LoginRes loginAdmin(@RequestBody LoginReq req, HttpServletRequest httpReq) {
         return handleLogin(req, "ADMIN", httpReq);
@@ -70,6 +75,10 @@ public class AuthController {
         if (u == null) {
             // Also check faculty employee_id
             u = db.one("SELECT u.* FROM users u JOIN faculty f ON f.user_id=u.id WHERE f.employee_id=? AND u.deleted_at IS NULL", idf);
+        }
+        if (u == null) {
+            // Also check owner owner_code
+            u = db.one("SELECT u.* FROM users u JOIN owners o ON o.user_id=u.id WHERE o.owner_code=? AND u.deleted_at IS NULL", idf);
         }
 
         if (u == null) {
@@ -112,10 +121,13 @@ public class AuthController {
         }
 
         // Enforce portal role compatibility
-        if ("ADMIN".equals(targetRole) && !role.contains("ADMIN") && !role.equals("ACCOUNTS") && !role.equals("EXAM_CELL")) {
+        if ("OWNER".equals(targetRole) && !role.equals("OWNER") && !role.equals("SUPER_ADMIN")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is not authorized for the Root Owner Portal.");
+        }
+        if ("ADMIN".equals(targetRole) && !role.contains("ADMIN") && !role.equals("ACCOUNTS") && !role.equals("EXAM_CELL") && !role.equals("OWNER") && !role.equals("PRINCIPAL") && !role.equals("DEAN")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is not authorized for the Admin Portal. Please use the appropriate login page.");
         }
-        if ("FACULTY".equals(targetRole) && !role.equals("FACULTY") && !role.contains("ADMIN")) {
+        if ("FACULTY".equals(targetRole) && !role.equals("FACULTY") && !role.contains("ADMIN") && !role.equals("HOD") && !role.equals("OWNER")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is not authorized for the Faculty Portal.");
         }
         if ("STUDENT".equals(targetRole) && !role.equals("STUDENT")) {
@@ -134,13 +146,17 @@ public class AuthController {
         // Fetch name and display code
         String name = "User";
         String code = idf;
-        if ("STUDENT".equals(role)) {
+        if ("OWNER".equals(role)) {
+            Map<String, Object> o = db.one("SELECT full_name, owner_code FROM owners WHERE user_id=?", uid);
+            name = o != null ? (String) o.getOrDefault("full_name", "Root Owner") : "Root Owner";
+            code = o != null ? (String) o.getOrDefault("owner_code", "OWN0001") : "OWN0001";
+        } else if ("STUDENT".equals(role)) {
             Map<String, Object> st = db.one("SELECT full_name, registration_number FROM students WHERE user_id=?", uid);
             if (st != null) {
                 name = (String) st.get("full_name");
                 code = (String) st.get("registration_number");
             }
-        } else if ("FACULTY".equals(role)) {
+        } else if ("FACULTY".equals(role) || "HOD".equals(role)) {
             Map<String, Object> f = db.one("SELECT full_name, employee_id FROM faculty WHERE user_id=?", uid);
             if (f != null) {
                 name = (String) f.get("full_name");

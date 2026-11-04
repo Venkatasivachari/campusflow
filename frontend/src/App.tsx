@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./LoginPages";
+import { OwnerPortal } from "./OwnerPages";
 import { AdminPortal } from "./AdminPages";
 import { FacultyPortal } from "./FacultyPages";
 import { StudentPortal } from "./StudentPages";
 import { BrandedSplashLoader, ErrorBoundary } from "./ui";
 import { getStoredAuth } from "./api";
 
-function ProtectedRoute({ role, children }: { role: "ADMIN" | "FACULTY" | "STUDENT"; children: JSX.Element }) {
+function ProtectedRoute({ role, children }: { role: "OWNER" | "ADMIN" | "FACULTY" | "STUDENT"; children: JSX.Element }) {
   const auth = getStoredAuth();
   if (!auth?.token) {
     return <Navigate to={`/${role.toLowerCase()}/login`} replace />;
   }
-  if (role === "ADMIN" && !auth.role?.includes("ADMIN") && auth.role !== "ACCOUNTS" && auth.role !== "EXAM_CELL") {
+  if (role === "OWNER" && auth.role !== "OWNER" && auth.role !== "SUPER_ADMIN") {
+    return <Navigate to="/owner/login" replace />;
+  }
+  if (role === "ADMIN" && !auth.role?.includes("ADMIN") && auth.role !== "ACCOUNTS" && auth.role !== "EXAM_CELL" && auth.role !== "OWNER" && auth.role !== "PRINCIPAL" && auth.role !== "DEAN") {
     return <Navigate to="/admin/login" replace />;
   }
-  if (role === "FACULTY" && auth.role !== "FACULTY" && !auth.role?.includes("ADMIN")) {
+  if (role === "FACULTY" && auth.role !== "FACULTY" && !auth.role?.includes("ADMIN") && auth.role !== "OWNER" && auth.role !== "HOD") {
     return <Navigate to="/faculty/login" replace />;
   }
   if (role === "STUDENT" && auth.role !== "STUDENT") {
@@ -45,12 +49,21 @@ export default function App() {
       {showSplash && <BrandedSplashLoader />}
       <BrowserRouter>
         <Routes>
-          {/* Three Separate Login Pages */}
+          {/* Four Dedicated Multi-Role Login Pages */}
+          <Route path="/owner/login" element={<LoginPage role="OWNER" />} />
           <Route path="/admin/login" element={<LoginPage role="ADMIN" />} />
           <Route path="/faculty/login" element={<LoginPage role="FACULTY" />} />
           <Route path="/student/login" element={<LoginPage role="STUDENT" />} />
 
           {/* Role Dedicated Portals */}
+          <Route
+            path="/owner/*"
+            element={
+              <ProtectedRoute role="OWNER">
+                <OwnerPortal />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/*"
             element={
@@ -76,8 +89,8 @@ export default function App() {
             }
           />
 
-          {/* Default Redirect */}
-          <Route path="*" element={<Navigate to="/admin/login" replace />} />
+          {/* Default Gateway Redirect */}
+          <Route path="*" element={<Navigate to="/owner/login" replace />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

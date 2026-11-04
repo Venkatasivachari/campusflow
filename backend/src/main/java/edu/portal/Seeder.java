@@ -38,14 +38,25 @@ public class Seeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // 1. Ensure Super Admin Account
+        // 1. Ensure Root Owner Account
+        if (db.count("SELECT COUNT(*) FROM users WHERE role='OWNER'") == 0) {
+            long ownerUid = db.insert("INSERT INTO users (email, password_hash, role, must_change_password) VALUES (?,?,'OWNER',FALSE)",
+                    "owner@college.local", enc.encode("Owner@12345"));
+            try {
+                db.insert("INSERT INTO owners (user_id, owner_code, full_name, official_email, phone, designation, status) VALUES (?,?,?,?,?,?,?)",
+                        ownerUid, "OWN0001", "Dr. Rajeshwar Rao", "owner@college.local", "+91 98490 12345", "Root Owner / Chancellor", "ACTIVE");
+            } catch (Exception ignored) {}
+            log.info("Created root owner account: owner@college.local (OWN0001)");
+        }
+
+        // 2. Ensure Super Admin Account
         if (db.count("SELECT COUNT(*) FROM users WHERE role='ADMIN'") == 0) {
             long uid = db.insert("INSERT INTO users (email, password_hash, role, must_change_password) VALUES (?,?,'ADMIN',FALSE)",
                     adminEmail, enc.encode(adminPassword));
             log.info("Created primary administrator account: {}", adminEmail);
         }
 
-        // 2. Seed Realistic Demo Data if requested and not yet seeded
+        // 3. Seed Realistic Demo Data if requested and not yet seeded
         if (seedDemo && db.count("SELECT COUNT(*) FROM students") == 0) {
             seedRealisticData();
         }
