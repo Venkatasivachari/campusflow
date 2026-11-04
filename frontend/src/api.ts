@@ -41,9 +41,12 @@ export async function apiReq<T = any>(url: string, opts: RequestInit = {}): Prom
 
   const res = await fetch(`${BASE}${url}`, { ...opts, headers });
   if (res.status === 401) {
+    const role = auth?.role?.toLowerCase();
     clearAuth();
     if (!window.location.pathname.includes("/login")) {
-      window.location.href = "/admin/login";
+      if (role === "student") window.location.href = "/student/login";
+      else if (role === "faculty") window.location.href = "/faculty/login";
+      else window.location.href = "/admin/login";
     }
     throw new Error("Session expired. Please log in again.");
   }
@@ -66,21 +69,26 @@ export async function apiReq<T = any>(url: string, opts: RequestInit = {}): Prom
 }
 
 export async function downloadBlob(url: string, filename: string): Promise<void> {
-  const auth = getStoredAuth();
-  const headers = new Headers();
-  if (auth?.token) {
-    headers.set("Authorization", `Bearer ${auth.token}`);
+  try {
+    const auth = getStoredAuth();
+    const headers = new Headers();
+    if (auth?.token) {
+      headers.set("Authorization", `Bearer ${auth.token}`);
+    }
+    const res = await fetch(`${BASE}${url}`, { headers });
+    if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
+    const blob = await res.blob();
+    const link = document.createElement("a");
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(link.href);
+  } catch (err: any) {
+    console.error("Download error:", err);
+    alert("Download failed: " + (err.message || "Server error"));
   }
-  const res = await fetch(`${BASE}${url}`, { headers });
-  if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
-  const blob = await res.blob();
-  const link = document.createElement("a");
-  link.href = window.URL.createObjectURL(blob);
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(link.href);
 }
 
 export const api = {
@@ -93,6 +101,15 @@ export const api = {
   forgotRequest: (identifier: string) => apiReq("/auth/forgot-password/request", { method: "POST", body: JSON.stringify({ identifier }) }),
   forgotReset: (req: any) => apiReq("/auth/forgot-password/reset", { method: "POST", body: JSON.stringify(req) }),
   getMe: () => apiReq("/auth/me"),
+  logout: () => apiReq("/auth/logout", { method: "POST" }),
+  refresh: (refreshToken: string) => apiReq("/auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
+
+  // Notifications (all roles)
+  notifications: {
+    getMyNotifications: () => apiReq("/notifications"),
+    markRead: (id: number) => apiReq(`/notifications/${id}/mark-read`, { method: "POST" }),
+    markAllRead: () => apiReq("/notifications/mark-all-read", { method: "POST" }),
+  },
 
   // Admin APIs
   admin: {
@@ -103,9 +120,12 @@ export const api = {
     },
     getStudentDetail: (id: number) => apiReq(`/admin/students/${id}`),
     createStudent: (data: any) => apiReq("/admin/students", { method: "POST", body: JSON.stringify(data) }),
+    updateStudent: (id: number, data: any) => apiReq(`/admin/students/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    deleteStudent: (id: number) => apiReq(`/admin/students/${id}`, { method: "DELETE" }),
     revealAadhaar: (id: number) => apiReq(`/admin/students/${id}/reveal-aadhaar`, { method: "POST" }),
     getFaculty: () => apiReq("/admin/faculty"),
     createFaculty: (data: any) => apiReq("/admin/faculty", { method: "POST", body: JSON.stringify(data) }),
+    updateFaculty: (id: number, data: any) => apiReq(`/admin/faculty/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     getPayrollRuns: () => apiReq("/admin/payroll/runs"),
     generatePayroll: (monthYear?: string) => apiReq("/admin/payroll/generate", { method: "POST", body: JSON.stringify({ monthYear }) }),
     markPayrollPaid: (id: number) => apiReq(`/admin/payroll/runs/${id}/mark-paid`, { method: "POST" }),
@@ -113,8 +133,11 @@ export const api = {
     getProgrammes: () => apiReq("/admin/programmes"),
     getCourses: () => apiReq("/admin/courses"),
     createCourse: (data: any) => apiReq("/admin/courses", { method: "POST", body: JSON.stringify(data) }),
+    getSections: () => apiReq("/admin/sections"),
     getTimetable: (secId: number) => apiReq(`/admin/timetable/${secId}`),
     createTimetableSlot: (data: any) => apiReq("/admin/timetable/slot", { method: "POST", body: JSON.stringify(data) }),
+    getAssignments: () => apiReq("/admin/assignments"),
+    recordFeePayment: (data: any) => apiReq("/admin/fees/payments", { method: "POST", body: JSON.stringify(data) }),
     getArrears: () => apiReq("/admin/arrears"),
     getAnnouncements: () => apiReq("/admin/announcements"),
     createAnnouncement: (data: any) => apiReq("/admin/announcements", { method: "POST", body: JSON.stringify(data) }),
@@ -123,6 +146,8 @@ export const api = {
     getBlockedAccounts: () => apiReq("/admin/logs/blocked"),
     getCommunicationLogs: () => apiReq("/admin/logs/communication"),
     toggleBlockUser: (userId: number, reason?: string) => apiReq(`/admin/users/${userId}/toggle-block`, { method: "POST", body: JSON.stringify({ reason }) }),
+    search: (q: string) => apiReq(`/admin/search?q=${encodeURIComponent(q)}`),
+    getReportsSummary: () => apiReq("/admin/reports/summary"),
   },
 
   // Faculty APIs
@@ -133,6 +158,12 @@ export const api = {
     markAttendance: (data: any) => apiReq("/faculty/attendance/mark", { method: "POST", body: JSON.stringify(data) }),
     getTimetable: () => apiReq("/faculty/timetable"),
     getPayslips: () => apiReq("/faculty/payslips"),
+    getAssignments: () => apiReq("/faculty/assignments"),
+    createAssignment: (data: any) => apiReq("/faculty/assignments", { method: "POST", body: JSON.stringify(data) }),
+    getSubmissions: (assignmentId: number) => apiReq(`/faculty/assignments/${assignmentId}/submissions`),
+    gradeSubmission: (subId: number, data: any) => apiReq(`/faculty/assignments/submissions/${subId}/grade`, { method: "POST", body: JSON.stringify(data) }),
+    getCourseMarks: (offeringId: number) => apiReq(`/faculty/courses/${offeringId}/marks`),
+    saveCourseMarks: (offeringId: number, data: any) => apiReq(`/faculty/courses/${offeringId}/marks`, { method: "POST", body: JSON.stringify(data) }),
   },
 
   // Student APIs
@@ -143,5 +174,9 @@ export const api = {
     getFees: () => apiReq("/student/fees"),
     getArrears: () => apiReq("/student/arrears"),
     registerReExam: (arrearId: number) => apiReq(`/student/arrears/${arrearId}/register-reexam`, { method: "POST" }),
+    getAssignments: () => apiReq("/student/assignments"),
+    submitAssignment: (assignmentId: number, data: any) => apiReq(`/student/assignments/${assignmentId}/submit`, { method: "POST", body: JSON.stringify(data) }),
+    getTimetable: () => apiReq("/student/timetable"),
+    updateProfile: (data: any) => apiReq("/student/profile", { method: "PUT", body: JSON.stringify(data) }),
   },
 };

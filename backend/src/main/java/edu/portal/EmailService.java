@@ -19,7 +19,7 @@ public class EmailService {
 
     public EmailService(JavaMailSender mailSender, Db db,
                         @Value("${app.mail.from:noreply@college.local}") String fromEmail,
-                        @Value("${app.base-url:http://localhost:5173}") String baseUrl) {
+                        @Value("${app.base-url:http://localhost:3000}") String baseUrl) {
         this.mailSender = mailSender;
         this.db = db;
         this.fromEmail = fromEmail;

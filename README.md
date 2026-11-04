@@ -52,7 +52,7 @@ This automatically:
 4. Executes Flyway migrations `V1` through `V3`.
 5. Seeds realistic demo records across all modules (students, faculty, timetable, attendance, marks, fees, arrears).
 6. Starts the Spring Boot backend API on `http://localhost:8080`.
-7. Starts the Vite React frontend on `http://localhost:5173`.
+7. Starts the Vite React frontend on `http://localhost:3000`.
 
 ---
 
@@ -62,9 +62,9 @@ Three separate login pathways are enforced on both UI and server:
 
 | Portal | URL | Accent | Default Credentials |
 |---|---|---|---|
-| **Admin Portal** | [http://localhost:5173/admin/login](http://localhost:5173/admin/login) | Indigo (`#4F46E5`) | `admin@college.local` / `Admin@12345` |
-| **Faculty Portal** | [http://localhost:5173/faculty/login](http://localhost:5173/faculty/login) | Teal (`#0F766E`) | `teacher1@college.local` / `Demo@12345` |
-| **Student Portal** | [http://localhost:5173/student/login](http://localhost:5173/student/login) | Violet (`#7C3AED`) | `student1@college.local` / `Demo@12345` |
+| **Admin Portal** | [http://localhost:3000/admin/login](http://localhost:3000/admin/login) | Indigo (`#4F46E5`) | `admin@college.local` / `Admin@12345` |
+| **Faculty Portal** | [http://localhost:3000/faculty/login](http://localhost:3000/faculty/login) | Teal (`#0F766E`) | `teacher1@college.local` / `Demo@12345` |
+| **Student Portal** | [http://localhost:3000/student/login](http://localhost:3000/student/login) | Violet (`#7C3AED`) | `student1@college.local` / `Demo@12345` |
 
 *(Student ID login also supported: `25CSE0001` .. `25CSE0015` with password `Demo@12345`)*.
 

@@ -24,14 +24,17 @@ public class AuthController {
     private final JwtService jwt;
     private final EmailService email;
     private final String defaultPassword;
+    private final String baseUrl;
 
     public AuthController(Db db, PasswordEncoder enc, JwtService jwt, EmailService email,
-                          @Value("${app.default-password:ChangeMe@123}") String defaultPassword) {
+                          @Value("${app.default-password:ChangeMe@123}") String defaultPassword,
+                          @Value("${app.base-url:http://localhost:3000}") String baseUrl) {
         this.db = db;
         this.enc = enc;
         this.jwt = jwt;
         this.email = email;
         this.defaultPassword = defaultPassword;
+        this.baseUrl = baseUrl;
     }
 
     public record LoginReq(String identifier, String password) {}
@@ -151,6 +154,35 @@ public class AuthController {
         return new LoginRes(token, refreshToken, uid, emailStr, role, name, code, mustChangePassword);
     }
 
+    @PostMapping("/refresh")
+    public Map<String, Object> refresh(@RequestBody Map<String, String> body) {
+        String rt = body != null ? body.get("refreshToken") : null;
+        if (rt == null || rt.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token required");
+        }
+        try {
+            AuthUser u = jwt.parse(rt);
+            Map<String, Object> dbUser = db.one("SELECT id, email, role, must_change_password, is_blocked FROM users WHERE id=? AND deleted_at IS NULL", u.id());
+            if (dbUser == null || Boolean.TRUE.equals(dbUser.get("is_blocked"))) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account invalid or blocked");
+            }
+            boolean mustChange = Boolean.TRUE.equals(dbUser.get("must_change_password"));
+            String newToken = jwt.issueAccessToken(u.id(), (String) dbUser.get("email"), (String) dbUser.get("role"), mustChange);
+            String newRefresh = jwt.issueRefreshToken(u.id(), (String) dbUser.get("email"));
+            return Map.of("token", newToken, "refreshToken", newRefresh);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        }
+    }
+
+    @PostMapping("/logout")
+    public Map<String, Object> logout(@AuthenticationPrincipal AuthUser user) {
+        if (user != null) {
+            db.update("DELETE FROM refresh_tokens WHERE user_id=?", user.id());
+        }
+        return Map.of("success", true, "message", "Logged out successfully");
+    }
+
     @PostMapping("/set-initial-password")
     public Map<String, Object> setInitialPassword(@AuthenticationPrincipal AuthUser user, @RequestBody Map<String, String> body) {
         String newPassword = body.get("newPassword");
@@ -205,7 +237,7 @@ public class AuthController {
             db.update("INSERT INTO password_reset_tokens (user_id, token, otp, expires_at) VALUES (?,?,?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))",
                     uid, token, otp);
 
-            email.sendOtpEmail(userEmail, otp, "http://localhost:5173/reset-password?token=" + token);
+            email.sendOtpEmail(userEmail, otp, baseUrl + "/reset-password?token=" + token);
         }
 
         return Map.of("success", true, "message", "If an account matches that identifier, an OTP has been sent to the registered email address.");

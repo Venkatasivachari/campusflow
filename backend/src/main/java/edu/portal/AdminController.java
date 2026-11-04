@@ -18,9 +18,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -121,8 +123,8 @@ public class AdminController {
                 "totalFaculty", totalFaculty,
                 "activeCourses", activeCourses,
                 "todayAttendance", todayAttendance,
-                "feeCollected", feeStats != null ? feeStats.get("total_collected") : 0,
-                "feePending", feeStats != null ? feeStats.get("total_pending") : 0,
+                "feeCollected", (feeStats != null && feeStats.get("total_collected") != null) ? feeStats.get("total_collected") : 0,
+                "feePending", (feeStats != null && feeStats.get("total_pending") != null) ? feeStats.get("total_pending") : 0,
                 "openArrears", openArrears,
                 "blockedAccounts", blockedAccounts
             ),
@@ -386,7 +388,7 @@ public class AdminController {
         long facultyId = db.insert("""
             INSERT INTO faculty (user_id, employee_id, full_name, email, phone, designation_id, department_id,
                                  qualification, experience_years, joining_date, employment_type)
-            VALUES (?,?,?,?,?,?,?,?,CURDATE(),'PERMANENT')
+            VALUES (?,?,?,?,?,?,?,?,?,CURDATE(),'PERMANENT')
             """, userId, empId, fullName, loginEmail, phone == null ? "N/A" : phone, desigId, deptId,
                 qualification == null ? "M.Tech / Ph.D" : qualification, expNum == null ? 3 : expNum.intValue());
 
@@ -706,5 +708,205 @@ public class AdminController {
         db.audit(user.id(), newBlocked ? "BLOCK_USER" : "UNBLOCK_USER", "users", String.valueOf(userId), null, reason, req.getRemoteAddr());
 
         return Map.of("success", true, "isBlocked", newBlocked);
+    }
+
+    @GetMapping("/sections")
+    public List<Map<String, Object>> getSections() {
+        return db.list("""
+            SELECT sec.*, sem.semester_number, b.admission_year, p.name AS programme_name
+            FROM sections sec
+            JOIN semesters sem ON sem.id = sec.semester_id
+            JOIN batches b ON b.id = sem.batch_id
+            JOIN programmes p ON p.id = b.programme_id
+            ORDER BY sec.id ASC
+            """);
+    }
+
+    @GetMapping("/assignments")
+    public List<Map<String, Object>> getAdminAssignments() {
+        return db.list("""
+            SELECT a.*, c.code AS course_code, c.name AS course_name,
+                   f.full_name AS faculty_name, sec.name AS section_name,
+                   (SELECT COUNT(*) FROM assignment_submissions asub WHERE asub.assignment_id = a.id) AS submission_count
+            FROM assignments a
+            JOIN course_offerings co ON co.id = a.offering_id
+            JOIN courses c ON c.id = co.course_id
+            JOIN faculty f ON f.id = co.faculty_id
+            JOIN sections sec ON sec.id = co.section_id
+            ORDER BY a.due_date DESC
+            """);
+    }
+
+    @PutMapping("/students/{id}")
+    public Map<String, Object> updateStudent(@AuthenticationPrincipal AuthUser user,
+                                             @PathVariable long id,
+                                             @RequestBody Map<String, Object> body,
+                                             HttpServletRequest req) {
+        Map<String, Object> existing = db.one("SELECT * FROM students WHERE id=? AND deleted_at IS NULL", id);
+        if (existing == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found");
+
+        String fullName = (String) body.get("fullName");
+        String phone = (String) body.get("phone");
+        String personalEmail = (String) body.get("personalEmail");
+        String address = (String) body.get("address");
+        String status = (String) body.getOrDefault("status", existing.get("status"));
+        Number sectionIdNum = (Number) body.get("sectionId");
+
+        db.update("""
+            UPDATE students
+            SET full_name = COALESCE(?, full_name),
+                phone = COALESCE(?, phone),
+                personal_email = COALESCE(?, personal_email),
+                address = COALESCE(?, address),
+                status = ?,
+                section_id = COALESCE(?, section_id)
+            WHERE id = ?
+            """, fullName, phone, personalEmail, address, status, sectionIdNum != null ? sectionIdNum.longValue() : null, id);
+
+        db.audit(user.id(), "UPDATE_STUDENT", "students", String.valueOf(id), null, "Updated student profile", req.getRemoteAddr());
+        return Map.of("success", true);
+    }
+
+    @DeleteMapping("/students/{id}")
+    public Map<String, Object> deleteStudent(@AuthenticationPrincipal AuthUser user,
+                                             @PathVariable long id,
+                                             HttpServletRequest req) {
+        Map<String, Object> existing = db.one("SELECT user_id FROM students WHERE id=? AND deleted_at IS NULL", id);
+        if (existing == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found");
+
+        db.update("UPDATE students SET deleted_at=NOW(), status='DISCONTINUED' WHERE id=?", id);
+        db.update("UPDATE users SET deleted_at=NOW(), is_blocked=TRUE WHERE id=?", existing.get("user_id"));
+        db.audit(user.id(), "DELETE_STUDENT", "students", String.valueOf(id), null, "Soft deleted student", req.getRemoteAddr());
+        return Map.of("success", true);
+    }
+
+    @PutMapping("/faculty/{id}")
+    public Map<String, Object> updateFaculty(@AuthenticationPrincipal AuthUser user,
+                                             @PathVariable long id,
+                                             @RequestBody Map<String, Object> body,
+                                             HttpServletRequest req) {
+        Map<String, Object> existing = db.one("SELECT * FROM faculty WHERE id=? AND deleted_at IS NULL", id);
+        if (existing == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Faculty not found");
+
+        String fullName = (String) body.get("fullName");
+        String phone = (String) body.get("phone");
+        String qualification = (String) body.get("qualification");
+        Number expNum = (Number) body.get("experienceYears");
+        String status = (String) body.getOrDefault("status", existing.get("status"));
+
+        db.update("""
+            UPDATE faculty
+            SET full_name = COALESCE(?, full_name),
+                phone = COALESCE(?, phone),
+                qualification = COALESCE(?, qualification),
+                experience_years = COALESCE(?, experience_years),
+                status = ?
+            WHERE id = ?
+            """, fullName, phone, qualification, expNum != null ? expNum.intValue() : null, status, id);
+
+        db.audit(user.id(), "UPDATE_FACULTY", "faculty", String.valueOf(id), null, "Updated faculty profile", req.getRemoteAddr());
+        return Map.of("success", true);
+    }
+
+    @PostMapping("/fees/payments")
+    public Map<String, Object> recordFeePayment(@AuthenticationPrincipal AuthUser user,
+                                                @RequestBody Map<String, Object> body,
+                                                HttpServletRequest req) {
+        Number studentFeeIdNum = (Number) body.get("studentFeeId");
+        Number amountNum = (Number) body.get("amount");
+        String paymentMode = (String) body.getOrDefault("paymentMode", "ONLINE");
+        String reference = (String) body.getOrDefault("reference", "REF-" + System.currentTimeMillis());
+
+        if (studentFeeIdNum == null || amountNum == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "studentFeeId and amount are required");
+        }
+
+        long sfId = studentFeeIdNum.longValue();
+        double amount = amountNum.doubleValue();
+
+        Map<String, Object> sf = db.one("SELECT sf.*, s.user_id FROM student_fees sf JOIN students s ON s.id = sf.student_id WHERE sf.id=?", sfId);
+        if (sf == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Student fee record not found");
+
+        String receiptNum = idGen.nextReceiptNumber();
+        long paymentId = db.insert("""
+            INSERT INTO fee_payments (student_fee_id, amount_paid, payment_mode, transaction_reference, receipt_number, payment_date, received_by)
+            VALUES (?,?,?,?,?,NOW(),?)
+            """, sfId, amount, paymentMode, reference, receiptNum, user.id());
+
+        double currentPaid = ((Number) sf.getOrDefault("total_paid", 0.0)).doubleValue();
+        double totalPayable = ((Number) sf.getOrDefault("total_payable", 0.0)).doubleValue();
+        double newPaid = currentPaid + amount;
+        double newBalance = Math.max(0.0, totalPayable - newPaid);
+        String newStatus = newBalance <= 0 ? "PAID" : "PARTIAL";
+
+        db.update("UPDATE student_fees SET total_paid=?, balance_due=?, status=? WHERE id=?", newPaid, newBalance, newStatus, sfId);
+
+        db.notify(((Number) sf.get("user_id")).longValue(), "Fee Payment Received",
+                "Payment of INR " + amount + " recorded. Receipt: " + receiptNum, "FEE", "/student/fees");
+
+        db.audit(user.id(), "RECORD_PAYMENT", "fee_payments", String.valueOf(paymentId), null, "Amount: " + amount + " Receipt: " + receiptNum, req.getRemoteAddr());
+
+        return Map.of("success", true, "paymentId", paymentId, "receiptNumber", receiptNum);
+    }
+
+    @GetMapping("/search")
+    public Map<String, Object> globalSearch(@RequestParam("q") String query) {
+        if (query == null || query.trim().length() < 2) {
+            return Map.of("students", List.of(), "faculty", List.of(), "courses", List.of());
+        }
+        String q = "%" + query.trim() + "%";
+        List<Map<String, Object>> students = db.list("""
+            SELECT id, full_name, registration_number, college_email
+            FROM students
+            WHERE (full_name LIKE ? OR registration_number LIKE ? OR roll_number LIKE ?) AND deleted_at IS NULL
+            LIMIT 10
+            """, q, q, q);
+
+        List<Map<String, Object>> faculty = db.list("""
+            SELECT id, full_name, employee_id, email
+            FROM faculty
+            WHERE (full_name LIKE ? OR employee_id LIKE ?) AND deleted_at IS NULL
+            LIMIT 10
+            """, q, q);
+
+        List<Map<String, Object>> courses = db.list("""
+            SELECT id, code, name, credits
+            FROM courses
+            WHERE code LIKE ? OR name LIKE ?
+            LIMIT 10
+            """, q, q);
+
+        return Map.of("students", students, "faculty", faculty, "courses", courses);
+    }
+
+    @GetMapping("/reports/summary")
+    public Map<String, Object> getReportsSummary() {
+        List<Map<String, Object>> deptStats = db.list("""
+            SELECT d.name AS department_name,
+                   COUNT(DISTINCT s.id) AS total_students,
+                   COUNT(DISTINCT f.id) AS total_faculty,
+                   COUNT(DISTINCT c.id) AS total_courses
+            FROM departments d
+            LEFT JOIN students s ON s.department_id = d.id AND s.deleted_at IS NULL
+            LEFT JOIN faculty f ON f.department_id = d.id AND f.deleted_at IS NULL
+            LEFT JOIN courses c ON c.department_id = d.id
+            GROUP BY d.id, d.name
+            """);
+
+        Map<String, Object> feesOverview = db.one("""
+            SELECT COALESCE(SUM(total_payable), 0) AS total_billed,
+                   COALESCE(SUM(total_paid), 0) AS total_collected,
+                   COALESCE(SUM(balance_due), 0) AS total_pending
+            FROM student_fees
+            """);
+
+        List<Map<String, Object>> gradeDist = db.list("""
+            SELECT grade, COUNT(*) AS count
+            FROM marks
+            GROUP BY grade
+            ORDER BY count DESC
+            """);
+
+        return Map.of("departments", deptStats, "fees", feesOverview, "gradeDistribution", gradeDist);
     }
 }

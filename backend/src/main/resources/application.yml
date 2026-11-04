@@ -9,7 +9,7 @@ spring:
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:college_portal}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&characterEncoding=utf8
     username: ${DB_USER:root}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:Sivachari@8919}
     hikari:
       pool-name: CollegePortalHikariPool
       maximum-pool-size: 15
@@ -20,7 +20,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
@@ -56,13 +56,17 @@ spring:
             required: false
 
 management:
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: always
+
 
 springdoc:
   api-docs:
@@ -85,6 +89,6 @@ app:
   temp-password-mode: ${TEMP_PASSWORD_MODE:default}
   mail:
     from: ${MAIL_FROM:noreply@college.local}
-  base-url: ${APP_BASE_URL:http://localhost:5173}
-  cors: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost}
+  base-url: ${APP_BASE_URL:http://localhost:3000}
+  cors: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:4173,http://localhost}
   seed-demo: ${SEED_DEMO_DATA:true}

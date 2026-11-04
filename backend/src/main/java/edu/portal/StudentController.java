@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -279,5 +280,107 @@ public class StudentController {
 
         db.update("UPDATE arrears SET status='REGISTERED_FOR_REEXAM', attempts_count=attempts_count+1 WHERE id=?", arrearId);
         return Map.of("success", true, "message", "Successfully registered for upcoming arrear re-exam.");
+    }
+
+    // =========================================================================
+    // ASSIGNMENTS & SUBMISSIONS
+    // =========================================================================
+    @GetMapping("/assignments")
+    public List<Map<String, Object>> getStudentAssignments(@AuthenticationPrincipal AuthUser user) {
+        long studentId = db.studentIdFor(user.id());
+        return db.list("""
+            SELECT a.id, a.offering_id, a.title, a.instructions, a.due_date, a.max_marks, a.attachment_url,
+                   c.code AS course_code, c.name AS course_name,
+                   f.full_name AS faculty_name,
+                   asub.id AS submission_id, asub.submission_text, asub.file_url, asub.submitted_at,
+                   asub.marks_obtained, asub.feedback, asub.graded_at,
+                   CASE
+                     WHEN asub.id IS NOT NULL THEN 'SUBMITTED'
+                     WHEN a.due_date < NOW() THEN 'OVERDUE'
+                     ELSE 'PENDING'
+                   END AS status
+            FROM course_registrations cr
+            JOIN assignments a ON a.offering_id = cr.offering_id
+            JOIN course_offerings co ON co.id = a.offering_id
+            JOIN courses c ON c.id = co.course_id
+            JOIN faculty f ON f.id = co.faculty_id
+            LEFT JOIN assignment_submissions asub ON asub.assignment_id = a.id AND asub.student_id = ?
+            WHERE cr.student_id = ?
+            ORDER BY a.due_date DESC
+            """, studentId, studentId);
+    }
+
+    @PostMapping("/assignments/{assignmentId}/submit")
+    public Map<String, Object> submitAssignment(@AuthenticationPrincipal AuthUser user, @PathVariable long assignmentId, @RequestBody Map<String, Object> body) {
+        long studentId = db.studentIdFor(user.id());
+
+        Map<String, Object> reg = db.one("""
+            SELECT cr.id FROM course_registrations cr
+            JOIN assignments a ON a.offering_id = cr.offering_id
+            WHERE a.id = ? AND cr.student_id = ?
+            """, assignmentId, studentId);
+        if (reg == null) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not registered for this course");
+
+        String text = (String) body.get("submissionText");
+        String fileUrl = (String) body.get("fileUrl");
+
+        Map<String, Object> existing = db.one("SELECT id FROM assignment_submissions WHERE assignment_id=? AND student_id=?", assignmentId, studentId);
+        if (existing != null) {
+            db.update("""
+                UPDATE assignment_submissions
+                SET submission_text=?, file_url=?, submitted_at=NOW()
+                WHERE id=?
+                """, text, fileUrl, existing.get("id"));
+        } else {
+            db.insert("""
+                INSERT INTO assignment_submissions (assignment_id, student_id, submission_text, file_url)
+                VALUES (?,?,?,?)
+                """, assignmentId, studentId, text, fileUrl);
+        }
+
+        return Map.of("success", true, "message", "Assignment submitted successfully");
+    }
+
+    // =========================================================================
+    // STUDENT TIMETABLE (WEEKLY)
+    // =========================================================================
+    @GetMapping("/timetable")
+    public List<Map<String, Object>> getStudentTimetable(@AuthenticationPrincipal AuthUser user) {
+        long studentId = db.studentIdFor(user.id());
+        Map<String, Object> st = db.one("SELECT section_id FROM students WHERE id=?", studentId);
+        if (st == null || st.get("section_id") == null) {
+            return List.of();
+        }
+        long sectionId = ((Number) st.get("section_id")).longValue();
+
+        return db.list("""
+            SELECT ts.day_of_week, ts.period_number, ts.start_time, ts.end_time,
+                   c.code AS course_code, c.name AS course_name, r.room_number,
+                   f.full_name AS faculty_name, ts.is_updated
+            FROM timetable_slots ts
+            JOIN course_offerings co ON co.id = ts.offering_id
+            JOIN courses c ON c.id = co.course_id
+            JOIN rooms r ON r.id = ts.room_id
+            JOIN faculty f ON f.id = co.faculty_id
+            JOIN timetable_versions tv ON tv.id = ts.version_id
+            WHERE co.section_id = ? AND tv.is_active = TRUE
+            ORDER BY ts.day_of_week, ts.period_number
+            """, sectionId);
+    }
+
+    @PutMapping("/profile")
+    public Map<String, Object> updateStudentProfile(@AuthenticationPrincipal AuthUser user, @RequestBody Map<String, String> body) {
+        long studentId = db.studentIdFor(user.id());
+        String phone = body.get("phone");
+        String address = body.get("address");
+
+        if (phone != null && !phone.isBlank()) {
+            db.update("UPDATE students SET phone=? WHERE id=?", phone.trim(), studentId);
+        }
+        if (address != null && !address.isBlank()) {
+            db.update("UPDATE students SET address=? WHERE id=?", address.trim(), studentId);
+        }
+
+        return Map.of("success", true, "message", "Profile updated successfully");
     }
 }

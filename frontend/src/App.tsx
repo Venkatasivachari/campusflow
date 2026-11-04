@@ -4,7 +4,7 @@ import { LoginPage } from "./LoginPages";
 import { AdminPortal } from "./AdminPages";
 import { FacultyPortal } from "./FacultyPages";
 import { StudentPortal } from "./StudentPages";
-import { BrandedSplashLoader } from "./ui";
+import { BrandedSplashLoader, ErrorBoundary } from "./ui";
 import { getStoredAuth } from "./api";
 
 function ProtectedRoute({ role, children }: { role: "ADMIN" | "FACULTY" | "STUDENT"; children: JSX.Element }) {
@@ -28,12 +28,20 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    if (
+      localStorage.getItem("theme") === "dark" ||
+      (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    ) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
     const t = setTimeout(() => setShowSplash(false), 800);
     return () => clearTimeout(t);
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       {showSplash && <BrandedSplashLoader />}
       <BrowserRouter>
         <Routes>
@@ -72,6 +80,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/admin/login" replace />} />
         </Routes>
       </BrowserRouter>
-    </>
+    </ErrorBoundary>
   );
 }

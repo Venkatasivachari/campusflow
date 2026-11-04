@@ -6,6 +6,6 @@ start "College Portal - Backend API" cmd /k "cd /d %~dp0backend && start-backend
 start "College Portal - Frontend Web" cmd /k "cd /d %~dp0frontend && npm run dev"
 echo.
 echo Both services are launching in separate windows!
-echo - Frontend UI:  http://localhost:5173
+echo - Frontend UI:  http://localhost:3000
 echo - Backend API:  http://localhost:8080
 echo.
