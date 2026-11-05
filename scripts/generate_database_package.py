@@ -891,3 +891,4 @@ ORDER BY current_year_of_study, department_id;
 
 if __name__ == "__main__":
     create_package()
+

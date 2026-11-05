@@ -18,9 +18,8 @@ print("=== TESTING ALL 4 PORTAL LOGIN WORKFLOWS ===")
 token_owner = test_login("Root Owner (Email)", "login/owner", "owner@college.local", "Owner@12345")
 token_owner_code = test_login("Root Owner (Code)", "login/owner", "OWN0001", "Owner@12345")
 token_admin = test_login("Administration (Email)", "login/admin", "admin@college.local", "Admin@12345")
-token_faculty = test_login("Faculty (Email)", "login/faculty", "teacher.cse1@college.local", "Demo@12345")
-token_faculty_code = test_login("Faculty (Employee ID)", "login/faculty", "FAC2018001", "Demo@12345")
-token_student = test_login("Student (Email)", "login/student", "manish.banerjee2025@college.local", "Demo@12345")
+token_faculty = test_login("Faculty (Email)", "login/faculty", "teacher1@college.local", "Demo@12345")
+token_faculty_code = test_login("Faculty (Employee ID)", "login/faculty", "FAC25001", "Demo@12345")
 token_student_reg = test_login("Student (Reg Number)", "login/student", "25CSE0001", "Demo@12345")
 
 if token_owner:

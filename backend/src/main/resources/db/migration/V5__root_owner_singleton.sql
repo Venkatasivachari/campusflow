@@ -33,3 +33,4 @@ ON DUPLICATE KEY UPDATE owner_id = 'OWN0001';
 INSERT INTO ownership_history (previous_owner_id, new_owner_id, approved_by, transfer_reason)
 SELECT 'NONE', 'OWN0001', 'SYSTEM_INIT', 'Initial Institution Foundation and Appointment of Dr. Rajeshwar Rao'
 WHERE NOT EXISTS (SELECT 1 FROM ownership_history WHERE new_owner_id = 'OWN0001');
+
