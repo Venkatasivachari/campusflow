@@ -72,3 +72,4 @@ This document describes the RESTful API endpoints provided by the Spring Boot ba
 | `/api/student/dashboard` | `GET` | Personal academic metrics: CGPA, attendance percentage, active arrears, fees status. |
 | `/api/student/timetable` | `GET` | Weekly timetable schedule for student's section. |
 | `/api/student/fees` | `GET` | Fee account summary and downloadable payment receipts. |
+

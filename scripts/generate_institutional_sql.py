@@ -1090,3 +1090,4 @@ ON DUPLICATE KEY UPDATE gross_salary=VALUES(gross_salary);
 
 if __name__ == "__main__":
     generate()
+
