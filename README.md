@@ -1,120 +1,93 @@
-# CampusFlow — Smart College Portal
-Enterprise College Management Portal built with **React 18 + TypeScript + Vite**, **Java 21 / Spring Boot 3**, and **MySQL 8**.
+# Imperial Institute - Enterprise College Management System (2015–2026)
 
-
----
-
-## 1. System Architecture
-
-| Layer | Technology |
-|---|---|
-| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS, Lucide Icons, Recharts, TanStack Query |
-| **Typography** | Headings: Plus Jakarta Sans; Body: Inter; Tabular/IDs: JetBrains Mono |
-| **Backend** | Java 21 / 23, Spring Boot 3.3.5 (Web, Security, Data JPA, Validation, Mail, Cache, Actuator) |
-| **Database** | Local MySQL 8.4 Server (InnoDB, utf8mb4), HikariCP Connection Pool |
-| **Migrations** | Flyway (`V1__init_schema.sql`, `V2__indexes.sql`, `V3__seed_reference_data.sql`) |
-| **Authentication** | JWT Access Token (15 min) + Refresh Token, BCrypt (strength 12) |
-| **Security & Privacy** | AES-256-GCM encryption for sensitive PII (Aadhaar, Bank details) with masked display and logged reveals (DPDP Act 2023 compliance) |
-| **Document Generation** | OpenPDF (Payslips, Fee Receipts, Grade Sheets), Apache POI (Excel export), OpenCSV |
+A mission-critical Institutional Management Platform built with **React 18 + TypeScript + Vite**, **Java 21/23 + Spring Boot 3**, and **MySQL 8**.
 
 ---
 
-## 2. Run Locally With My MySQL
+## 1. System Architecture & Ownership Model
 
-### Step 1: Configure Credentials in `.env`
-Open `.env` in the `college-portal/` folder and fill in your local MySQL password:
+The system operates under a **Single Institution Architecture** with **Exactly One Active Root Owner**:
 
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=college_portal
-DB_USER=root
-DB_PASSWORD=your_mysql_password_here
+```
+ROOT OWNER / CHANCELLOR (Dr. Rajeshwar Rao • OWN0001)
+ └── SUPER ADMIN (Platform Technical & Security Control)
+      └── COLLEGE ADMINISTRATION (Principal, Academic Dean, Admin Officer)
+           └── HEADS OF DEPARTMENTS (CSE, ECE, IT, EEE, MECH, CIVIL)
+                └── FACULTY / PROFESSORS (Teaching, Attendance, Marks, Mentoring)
+                     └── CLASS REPRESENTATIVES
+                          └── STUDENTS (9,000 Historical & Active Records)
 ```
 
-*(Optional dedicated user)*: If you prefer creating a dedicated non-root user, execute `db/setup_mysql.sql` in MySQL Workbench or CLI:
-```sql
-CREATE DATABASE IF NOT EXISTS college_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'portal_user'@'localhost' IDENTIFIED BY 'portal_pass123';
-GRANT ALL PRIVILEGES ON college_portal.* TO 'portal_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-### Step 2: One-Click Launch
-Double-click or run:
-```cmd
-start-all.bat
-```
-This automatically:
-1. Loads environment variables from `.env`.
-2. Connects to your local MySQL 8 on `localhost:3306`.
-3. Auto-creates `college_portal` database if it doesn't already exist.
-4. Executes Flyway migrations `V1` through `V3`.
-5. Seeds realistic demo records across all modules (students, faculty, timetable, attendance, marks, fees, arrears).
-6. Starts the Spring Boot backend API on `http://localhost:8080`.
-7. Starts the Vite React frontend on `http://localhost:3000`.
+- **Singleton Root Owner Control**: Enforced in the database through table `root_owner_control` with `CHECK (singleton_id = 1)`. Any attempt to create a secondary owner fails at the database level.
+- **Immutable Ownership Transfer**: All historical authority transfers are permanently recorded in `ownership_history`.
 
 ---
 
-## 3. Dedicated Login Portals
+## 2. Integrated Student Dataset (9,000 Records: 2015–2026)
 
-Three separate login pathways are enforced on both UI and server:
+The system integrates and enriches **9,000 student records** from `student_dataset_v1.xlsx`:
 
-| Portal | URL | Accent | Default Credentials |
-|---|---|---|---|
-| **Admin Portal** | [http://localhost:3000/admin/login](http://localhost:3000/admin/login) | Indigo (`#4F46E5`) | `admin@college.local` / `Admin@12345` |
-| **Faculty Portal** | [http://localhost:3000/faculty/login](http://localhost:3000/faculty/login) | Teal (`#0F766E`) | `teacher1@college.local` / `Demo@12345` |
-| **Student Portal** | [http://localhost:3000/student/login](http://localhost:3000/student/login) | Violet (`#7C3AED`) | `student1@college.local` / `Demo@12345` |
-
-*(Student ID login also supported: `25CSE0001` .. `25CSE0015` with password `Demo@12345`)*.
+| Parameter | Metric / Value |
+| :--- | :--- |
+| **Total Student Records** | 9,000 |
+| **Gender Distribution** | 4,510 Male (50.11%) • 4,490 Female (49.89%) |
+| **Source Phone Numbers** | 100% Unique, valid 10-digit mobile numbers |
+| **Source Identity Preservation** | Raw records preserved in `student_source_records` |
+| **Data Cleaning** | 165 encoding/character anomalies detected and resolved in Romanized `display_name` |
+| **Historical Scope** | 12 Annual Cohorts from **2015–16 to 2026–27** (750 students/year) |
+| **Current Active Enrolled** | 3,000 students (1st, 2nd, 3rd, and 4th Years) |
+| **Graduated Alumni** | 5,856 students |
+| **Faculty Roster** | 60 Faculty Members (6 HODs, 18 Professors, 36 Associate/Assistant Professors) |
 
 ---
 
-## 4. Entity Relationship Diagram (3NF Normalized)
+## 3. Dedicated Portal Login URLs & Credentials
 
-```mermaid
-erDiagram
-    USERS ||--o{ STUDENTS : "owns profile"
-    USERS ||--o{ FACULTY : "owns profile"
-    USERS ||--o{ AUDIT_LOG : "triggers"
-    USERS ||--o{ LOGIN_LOG : "records"
-    USERS ||--o{ BLOCKED_ACCOUNT_REGISTER : "tracked in"
-    
-    DEPARTMENTS ||--o{ PROGRAMMES : "offers"
-    DEPARTMENTS ||--o{ COURSES : "owns"
-    DEPARTMENTS ||--o{ FACULTY : "employs"
-    
-    PROGRAMMES ||--o{ BATCHES : "contains"
-    BATCHES ||--o{ SEMESTERS : "divided into"
-    SEMESTERS ||--o{ SECTIONS : "has"
-    
-    COURSES ||--o{ COURSE_OFFERINGS : "scheduled as"
-    FACULTY ||--o{ COURSE_OFFERINGS : "teaches"
-    SECTIONS ||--o{ COURSE_OFFERINGS : "attends"
-    
-    COURSE_OFFERINGS ||--o{ TIMETABLE_SLOTS : "allocated"
-    COURSE_OFFERINGS ||--o{ ATTENDANCE_SESSIONS : "conducted"
-    COURSE_OFFERINGS ||--o{ ASSIGNMENTS : "given in"
-    COURSE_OFFERINGS ||--o{ MARKS : "graded in"
-    
-    STUDENTS ||--o{ COURSE_REGISTRATIONS : "registers"
-    STUDENTS ||--o{ ATTENDANCE_RECORDS : "marked"
-    STUDENTS ||--o{ ASSIGNMENT_SUBMISSIONS : "submits"
-    STUDENTS ||--o{ MARKS : "receives"
-    STUDENTS ||--o{ ARREARS : "tracks pending"
-    STUDENTS ||--o{ STUDENT_FEES : "incurred"
-    STUDENT_FEES ||--o{ FEE_PAYMENTS : "paid against"
-    
-    FACULTY ||--o{ FACULTY_SALARY : "structured"
-    PAYROLL_RUNS ||--o{ PAYSLIPS : "disburses"
-    FACULTY ||--o{ PAYSLIPS : "receives"
+| Portal | URL | Username / Identifier | Password | Key Capabilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **Root Owner** | [`http://localhost:3000/owner/login`](http://localhost:3000/owner/login) | `owner@college.local` or `OWN0001` | `Owner@12345` | Supreme governance, 2015–2026 cohort analytics, department ratios, financial audit. |
+| **Administration** | [`http://localhost:3000/admin/login`](http://localhost:3000/admin/login) | `admin@college.local` | `Admin@12345` | Admissions, batch promotions, faculty rosters, fee structures, security logs. |
+| **Faculty** | [`http://localhost:3000/faculty/login`](http://localhost:3000/faculty/login) | `teacher1@college.local` or `FAC25001` | `Demo@12345` | Attendance entry, assessment marks, mentee tracking, course syllabus. |
+| **Student** | [`http://localhost:3000/student/login`](http://localhost:3000/student/login) | `25CSE0001` or `manish.banerjee2025@college.local` | `Demo@12345` | CGPA calculation, semester attendance percentage, timetable, fee receipts. |
+
+---
+
+## 4. Generated Artifacts & Datasets
+
+All required datasets and database scripts are generated and located in `data/` and `database/`:
+
+1. [`data/cleaned_student_dataset.xlsx`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/data/cleaned_student_dataset.xlsx): Standardized student records with original data preserved.
+2. [`data/enriched_student_dataset.xlsx`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/data/enriched_student_dataset.xlsx): Full 9,000 student records enriched with admission batches, departments, semesters, sections, CGPA, and faculty allocations.
+3. [`data/faculty_demo_dataset.xlsx`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/data/faculty_demo_dataset.xlsx): 60 faculty demonstration profiles with designations and salary structures.
+4. [`data/data_quality_report.xlsx`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/data/data_quality_report.xlsx): Complete data validation report with metrics, repeated names, and encoding checks.
+5. [`data/student_import_errors.xlsx`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/data/student_import_errors.xlsx): Preserved review template for rejected rows.
+6. [`database/college_database_schema.sql`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/database/college_database_schema.sql): Complete DDL schema ready for MySQL Workbench.
+7. [`database/historical_analytics.sql`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/database/historical_analytics.sql): Year-wise cohort analytics views (2015–2026).
+8. [`database/faculty_student_allocation.sql`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/database/faculty_student_allocation.sql): Allocation mapping procedures and views.
+9. [`database/sample_data.sql`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/database/sample_data.sql): Master population script (5.7 MB) with all 9,000 students and 60 faculty members.
+10. [`database_relationships.md`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/database_relationships.md): Detailed ERD and relationship documentation.
+11. [`API_DOCUMENTATION.md`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/API_DOCUMENTATION.md): REST API specification.
+
+---
+
+## 5. Running the Application
+
+### Option A: Direct Local Execution (Running Now)
+- **Launch via batch file**: Double click [`start-all.bat`](file:///c:/Users/VENKATASIVA/Downloads/college-portal%20(1)/college-portal/start-all.bat)
+- **Frontend URL**: `http://localhost:3000`
+- **Backend API**: `http://localhost:8080`
+- **Database**: Local MySQL Server 8.0 on port 3306 (`college_portal`)
+
+### Option B: Docker Compose
+Once Docker Desktop is opened:
+```bash
+docker compose up -d
 ```
+All 3 containers (`portal-db`, `portal-api`, `portal-web`) will run automatically on `http://localhost:3000`.
 
----
-
-## 5. Security & Verification Notes
-
-- **Password Policy**: Minimum 8 characters, with uppercase, lowercase, digit, and symbol. Cannot match default password.
-- **Lockout Mechanism**: 5 consecutive failed login attempts automatically locks the account for 15 minutes and writes an entry to `blocked_account_register`.
-- **First Login Forced Reset**: Accounts flagged with `must_change_password=TRUE` are restricted from accessing any API endpoint until a new strong password is set.
-- **DPDP Act 2023 Masking**: Aadhaar numbers are AES-GCM encrypted in the database. UI shows masked `XXXX XXXX 1234`. Every reveal action by an administrator is recorded in `audit_log` with user ID, IP address, and timestamp.
+### Option C: MySQL Workbench
+Open MySQL Workbench, connect to `localhost:3306`, and execute:
+1. `database/college_database_schema.sql`
+2. `database/historical_analytics.sql`
+3. `database/faculty_student_allocation.sql`
+4. `database/sample_data.sql`
