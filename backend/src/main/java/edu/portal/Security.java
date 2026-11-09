@@ -50,8 +50,8 @@ class JwtService {
     private final long refreshExpiryDays;
 
     JwtService(@Value("${app.jwt.secret}") String secret,
-               @Value("${app.jwt.expiry-minutes:15}") long accessExpiryMinutes,
-               @Value("${app.jwt.refresh-expiry-days:7}") long refreshExpiryDays) throws Exception {
+               @Value("${app.jwt.expiry-minutes:1440}") long accessExpiryMinutes,
+               @Value("${app.jwt.refresh-expiry-days:30}") long refreshExpiryDays) throws Exception {
         byte[] hash = MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8));
         this.key = new SecretKeySpec(hash, "HmacSHA256");
         this.accessExpiryMinutes = accessExpiryMinutes;

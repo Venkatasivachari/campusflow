@@ -29,6 +29,35 @@ export function clearAuth() {
   localStorage.removeItem("auth");
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const auth = getStoredAuth();
+  if (!auth?.refreshToken) return null;
+
+  try {
+    const res = await fetch(`${BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: auth.refreshToken }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.token) {
+      const updated: AuthState = {
+        ...auth,
+        token: data.token,
+        refreshToken: data.refreshToken || auth.refreshToken,
+      };
+      saveAuth(updated);
+      return data.token;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export async function apiReq<T = any>(url: string, opts: RequestInit = {}): Promise<T> {
   const auth = getStoredAuth();
   const headers = new Headers(opts.headers || {});
@@ -39,7 +68,22 @@ export async function apiReq<T = any>(url: string, opts: RequestInit = {}): Prom
     headers.set("Authorization", `Bearer ${auth.token}`);
   }
 
-  const res = await fetch(`${BASE}${url}`, { ...opts, headers });
+  let res = await fetch(`${BASE}${url}`, { ...opts, headers });
+
+  // If 401 on non-auth endpoint, attempt token refresh once
+  if (res.status === 401 && !url.startsWith("/auth/")) {
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken().finally(() => {
+        refreshPromise = null;
+      });
+    }
+    const newToken = await refreshPromise;
+    if (newToken) {
+      headers.set("Authorization", `Bearer ${newToken}`);
+      res = await fetch(`${BASE}${url}`, { ...opts, headers });
+    }
+  }
+
   if (res.status === 401) {
     const role = auth?.role?.toLowerCase();
     clearAuth();

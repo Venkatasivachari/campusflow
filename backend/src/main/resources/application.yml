@@ -77,8 +77,8 @@ springdoc:
 app:
   jwt:
     secret: ${JWT_SECRET:c21hcnQtY29sbGVnZS1wb3J0YWwtc3VwZXItc2VjcmV0LWtleS0yMDI2LXNlY3VyZQ==}
-    expiry-minutes: ${JWT_EXPIRY_MINUTES:15}
-    refresh-expiry-days: ${REFRESH_TOKEN_EXPIRY_DAYS:7}
+    expiry-minutes: ${JWT_EXPIRY_MINUTES:1440}
+    refresh-expiry-days: ${REFRESH_TOKEN_EXPIRY_DAYS:30}
   aes:
     key: ${AES_KEY:kkQyevX5K+XCy02w28oTsjOT57EeldRveONZpfIev+4=}
   admin:
