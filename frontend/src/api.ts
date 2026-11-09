@@ -85,6 +85,17 @@ export async function apiReq<T = any>(url: string, opts: RequestInit = {}): Prom
   }
 
   if (res.status === 401) {
+    if (url.startsWith("/auth/")) {
+      let msg = "Invalid identifier or password. Please verify your credentials.";
+      try {
+        const err = await res.json();
+        msg = err.message || err.error || msg;
+      } catch {
+        // ignore
+      }
+      throw new Error(msg);
+    }
+
     const role = auth?.role?.toLowerCase();
     clearAuth();
     if (!window.location.pathname.includes("/login")) {
