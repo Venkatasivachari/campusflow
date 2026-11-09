@@ -413,7 +413,7 @@ export function OwnerPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {departments.map((d: any) => {
+                  {(departments || []).map((d: any) => {
                     const ratio = Number(d.student_faculty_ratio);
                     return (
                       <tr key={d.id}>
@@ -466,7 +466,7 @@ export function OwnerPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {admins.map((a: any) => (
+                  {(admins || []).map((a: any) => (
                     <tr key={a.id}>
                       <td className="font-mono font-semibold">{a.email}</td>
                       <td>
@@ -550,7 +550,7 @@ export function OwnerPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {auditLogs.map((log: any) => (
+                  {(auditLogs || []).map((log: any) => (
                     <tr key={log.id}>
                       <td className="text-xs font-mono text-[#64708A]">{new Date(log.created_at).toLocaleString()}</td>
                       <td>

@@ -148,31 +148,108 @@ public class AdminController {
                                            @RequestParam(required = false) Long departmentId,
                                            @RequestParam(required = false) Long programmeId,
                                            @RequestParam(required = false) Integer semester,
+                                           @RequestParam(required = false) Integer yearOfStudy,
+                                           @RequestParam(required = false) Integer admissionYear,
+                                           @RequestParam(required = false) String gender,
+                                           @RequestParam(required = false) Double minCgpa,
+                                           @RequestParam(required = false) Double maxCgpa,
+                                           @RequestParam(required = false) String attendanceFilter,
+                                           @RequestParam(required = false) String status,
+                                           @RequestParam(defaultValue = "id") String sortBy,
+                                           @RequestParam(defaultValue = "desc") String sortDir,
                                            @RequestParam(defaultValue = "1") int page,
-                                           @RequestParam(defaultValue = "15") int size) {
+                                           @RequestParam(defaultValue = "20") int size) {
         int offset = (Math.max(1, page) - 1) * size;
-        String q = "%" + search.trim() + "%";
+        List<Object> filterParams = new ArrayList<>();
+        StringBuilder filterSql = new StringBuilder(" WHERE s.deleted_at IS NULL");
 
-        List<Object> params = new ArrayList<>(List.of(q, q, q));
-        StringBuilder filterSql = new StringBuilder();
-        if (departmentId != null) {
+        if (search != null && !search.trim().isEmpty()) {
+            String q = "%" + search.trim() + "%";
+            filterSql.append(" AND (s.full_name LIKE ? OR s.registration_number LIKE ? OR s.roll_number LIKE ? OR s.phone LIKE ? OR s.college_email LIKE ?)");
+            filterParams.add(q);
+            filterParams.add(q);
+            filterParams.add(q);
+            filterParams.add(q);
+            filterParams.add(q);
+        }
+        if (departmentId != null && departmentId > 0) {
             filterSql.append(" AND s.department_id = ?");
-            params.add(departmentId);
+            filterParams.add(departmentId);
         }
-        if (programmeId != null) {
+        if (programmeId != null && programmeId > 0) {
             filterSql.append(" AND s.programme_id = ?");
-            params.add(programmeId);
+            filterParams.add(programmeId);
         }
-        if (semester != null) {
+        if (semester != null && semester > 0) {
             filterSql.append(" AND s.current_semester = ?");
-            params.add(semester);
+            filterParams.add(semester);
+        }
+        if (yearOfStudy != null && yearOfStudy > 0) {
+            filterSql.append(" AND s.current_year_of_study = ?");
+            filterParams.add(yearOfStudy);
+        }
+        if (admissionYear != null && admissionYear > 0) {
+            filterSql.append(" AND s.admission_year = ?");
+            filterParams.add(admissionYear);
+        }
+        if (gender != null && !gender.trim().isEmpty() && !gender.equalsIgnoreCase("ALL")) {
+            filterSql.append(" AND UPPER(s.gender) = ?");
+            filterParams.add(gender.trim().toUpperCase());
+        }
+        if (minCgpa != null) {
+            filterSql.append(" AND sas.current_cgpa >= ?");
+            filterParams.add(minCgpa);
+        }
+        if (maxCgpa != null) {
+            filterSql.append(" AND sas.current_cgpa <= ?");
+            filterParams.add(maxCgpa);
+        }
+        if (attendanceFilter != null && !attendanceFilter.trim().isEmpty()) {
+            if ("LOW".equalsIgnoreCase(attendanceFilter)) {
+                filterSql.append(" AND sas.attendance_percentage < 75.0");
+            } else if ("GOOD".equalsIgnoreCase(attendanceFilter)) {
+                filterSql.append(" AND sas.attendance_percentage >= 75.0");
+            }
+        }
+        if (status != null && !status.trim().isEmpty() && !status.equalsIgnoreCase("ALL")) {
+            filterSql.append(" AND UPPER(s.status) = ?");
+            filterParams.add(status.trim().toUpperCase());
         }
 
-        String countSql = "SELECT COUNT(*) FROM students s WHERE s.deleted_at IS NULL AND (s.full_name LIKE ? OR s.registration_number LIKE ? OR s.college_email LIKE ?)" + filterSql;
-        long total = db.count(countSql, params.toArray());
+        String countSql = """
+            SELECT COUNT(DISTINCT s.id)
+            FROM students s
+            LEFT JOIN student_academic_status sas ON sas.student_id = s.id
+            """ + filterSql.toString();
+        long total = db.count(countSql, filterParams.toArray());
 
-        params.add(size);
-        params.add(offset);
+        // Quick stats for filtered dataset
+        String statsSql = """
+            SELECT 
+                COALESCE(SUM(CASE WHEN UPPER(s.gender) = 'MALE' THEN 1 ELSE 0 END), 0) AS male_count,
+                COALESCE(SUM(CASE WHEN UPPER(s.gender) = 'FEMALE' THEN 1 ELSE 0 END), 0) AS female_count,
+                COALESCE(ROUND(AVG(sas.current_cgpa), 2), 0.00) AS avg_cgpa
+            FROM students s
+            LEFT JOIN student_academic_status sas ON sas.student_id = s.id
+            """ + filterSql.toString();
+        Map<String, Object> stats = db.one(statsSql, filterParams.toArray());
+
+        String orderClause;
+        boolean isAsc = "asc".equalsIgnoreCase(sortDir);
+        switch (sortBy.toLowerCase()) {
+            case "name" -> orderClause = " ORDER BY s.full_name " + (isAsc ? "ASC" : "DESC");
+            case "cgpa" -> orderClause = " ORDER BY sas.current_cgpa " + (isAsc ? "ASC" : "DESC");
+            case "attendance" -> orderClause = " ORDER BY sas.attendance_percentage " + (isAsc ? "ASC" : "DESC");
+            case "regno" -> orderClause = " ORDER BY s.registration_number " + (isAsc ? "ASC" : "DESC");
+            case "year" -> orderClause = " ORDER BY s.current_year_of_study " + (isAsc ? "ASC" : "DESC") + ", s.id DESC";
+            case "sem" -> orderClause = " ORDER BY s.current_semester " + (isAsc ? "ASC" : "DESC") + ", s.id DESC";
+            default -> orderClause = " ORDER BY s.id " + (isAsc ? "ASC" : "DESC");
+        }
+
+        List<Object> dataParams = new ArrayList<>(filterParams);
+        dataParams.add(size);
+        dataParams.add(offset);
+
         String dataSql = """
             SELECT s.id, s.registration_number, s.roll_number, s.full_name, s.college_email, s.personal_email,
                    s.phone, s.dob, s.gender, s.abc_id, s.current_semester, s.current_year_of_study, s.admission_year,
@@ -186,11 +263,18 @@ public class AdminController {
             JOIN programmes p ON p.id = s.programme_id
             LEFT JOIN student_academic_status sas ON sas.student_id = s.id
             LEFT JOIN student_guardians sg ON sg.student_id = s.id
-            WHERE s.deleted_at IS NULL AND (s.full_name LIKE ? OR s.registration_number LIKE ? OR s.college_email LIKE ?)
-            """ + filterSql + " ORDER BY s.id DESC LIMIT ? OFFSET ?";
+            """ + filterSql.toString() + orderClause + " LIMIT ? OFFSET ?";
 
-        List<Map<String, Object>> students = db.list(dataSql, params.toArray());
-        return Map.of("items", students, "total", total, "page", page, "size", size);
+        List<Map<String, Object>> students = db.list(dataSql, dataParams.toArray());
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("items", students);
+        resp.put("total", total);
+        resp.put("page", page);
+        resp.put("size", size);
+        resp.put("maleCount", stats != null ? stats.get("male_count") : 0);
+        resp.put("femaleCount", stats != null ? stats.get("female_count") : 0);
+        resp.put("avgCgpa", stats != null ? stats.get("avg_cgpa") : 0.0);
+        return resp;
     }
 
     @GetMapping("/students/{id}")

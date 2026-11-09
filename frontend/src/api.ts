@@ -128,8 +128,15 @@ export const api = {
   admin: {
     getDashboard: () => apiReq("/admin/dashboard"),
     getStudents: (params?: any) => {
-      const qs = new URLSearchParams(params).toString();
-      return apiReq(`/admin/students?${qs}`);
+      if (!params) return apiReq("/admin/students");
+      const cleanParams: any = {};
+      Object.keys(params).forEach((k) => {
+        if (params[k] !== undefined && params[k] !== null && params[k] !== "") {
+          cleanParams[k] = String(params[k]);
+        }
+      });
+      const qs = new URLSearchParams(cleanParams).toString();
+      return apiReq(`/admin/students${qs ? `?${qs}` : ""}`);
     },
     getStudentDetail: (id: number) => apiReq(`/admin/students/${id}`),
     createStudent: (data: any) => apiReq("/admin/students", { method: "POST", body: JSON.stringify(data) }),

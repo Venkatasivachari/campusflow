@@ -392,7 +392,7 @@ export function FacultyPortal() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {data.map((c: any) => (
+                    {(Array.isArray(data) ? data : (data?.courses || [])).map((c: any) => (
                       <div key={c.offering_id} className="card p-5 space-y-3 flex flex-col justify-between">
                         <div>
                           <div className="flex justify-between items-start">
@@ -436,13 +436,13 @@ export function FacultyPortal() {
                     </button>
                   </div>
 
-                  {(!data || data.length === 0) ? (
+                  {(!data || !Array.isArray(data) || data.length === 0) ? (
                     <div className="card p-8 text-center text-xs text-[#64708A]">
                       No assignments posted yet. Click "Create Assignment" to assign coursework.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {data.map((a: any) => (
+                      {(Array.isArray(data) ? data : []).map((a: any) => (
                         <div key={a.id} className="card p-5 space-y-3 flex flex-col justify-between">
                           <div>
                             <div className="flex justify-between items-start">
@@ -590,13 +590,14 @@ export function FacultyPortal() {
                     <p className="text-xs text-[#64708A]">Allocated teaching load by period and lecture hall.</p>
                   </div>
 
-                  {(!data || data.length === 0) ? (
+                  {(!data || !Array.isArray(data) || data.length === 0) ? (
                     <div className="card p-8 text-center text-xs text-[#64708A]">No timetable slots assigned.</div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {daysOfWeek.map((dayName, idx) => {
                         const dayNum = idx + 1;
-                        const daySlots = data.filter((s: any) => s.day_of_week === dayNum);
+                        const slots = Array.isArray(data) ? data : ((data as any)?.slots || []);
+                        const daySlots = slots.filter((s: any) => s.day_of_week === dayNum);
                         return (
                           <div key={dayName} className="card p-4 space-y-3">
                             <div className="flex justify-between items-center border-b border-[#E5E8F0] dark:border-[#1F293D] pb-2">
@@ -653,7 +654,7 @@ export function FacultyPortal() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.map((p: any) => (
+                        {(Array.isArray(data) ? data : (data?.payslips || [])).map((p: any) => (
                           <tr key={p.id}>
                             <td className="font-mono font-bold text-teal-600 dark:text-teal-400">{p.month_year}</td>
                             <td className="font-mono">INR {Number(p.basic).toLocaleString()}</td>

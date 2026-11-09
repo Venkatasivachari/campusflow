@@ -348,7 +348,7 @@ export function StudentPortal() {
                     <p className="text-xs text-[#64708A]">Official section timetable with assigned faculty and room allocations.</p>
                   </div>
 
-                  {(!data || data.length === 0) ? (
+                  {(!data || !Array.isArray(data) || data.length === 0) ? (
                     <div className="card p-8 text-center text-xs text-[#64708A]">
                       No timetable slots allocated for your current section.
                     </div>
@@ -356,7 +356,8 @@ export function StudentPortal() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {daysOfWeek.map((dayName, idx) => {
                         const dayNum = idx + 1;
-                        const daySlots = data.filter((s: any) => s.day_of_week === dayNum);
+                        const slots = Array.isArray(data) ? data : ((data as any)?.slots || []);
+                        const daySlots = slots.filter((s: any) => s.day_of_week === dayNum);
                         return (
                           <div key={dayName} className="card p-4 space-y-3">
                             <div className="flex items-center justify-between border-b border-[#E5E8F0] dark:border-[#1F293D] pb-2">
@@ -398,13 +399,13 @@ export function StudentPortal() {
                     <p className="text-xs text-[#64708A]">Coursework instructions, submission upload, and faculty marks feedback.</p>
                   </div>
 
-                  {(!data || data.length === 0) ? (
+                  {(!data || !Array.isArray(data) || data.length === 0) ? (
                     <div className="card p-8 text-center text-xs text-[#64708A]">
                       No assignments currently posted for your registered courses.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {data.map((a: any) => (
+                      {(Array.isArray(data) ? data : []).map((a: any) => (
                         <div key={a.id} className="card p-5 space-y-3 flex flex-col justify-between">
                           <div>
                             <div className="flex items-start justify-between gap-2">
@@ -498,11 +499,11 @@ export function StudentPortal() {
                   {/* 60-Day Heatmap */}
                   <div className="card p-6">
                     <h4 className="text-xs font-bold text-[#0B1020] dark:text-white uppercase tracking-wider mb-4">60-Day Session Heatmap</h4>
-                    {(data.heatmap || []).length === 0 ? (
+                    {(!data?.heatmap || !Array.isArray(data.heatmap) || data.heatmap.length === 0) ? (
                       <p className="text-xs text-[#64708A] text-center py-4">No recent attendance session logs found.</p>
                     ) : (
                       <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
-                        {data.heatmap.map((h: any, i: number) => (
+                        {(Array.isArray(data.heatmap) ? data.heatmap : []).map((h: any, i: number) => (
                           <div
                             key={i}
                             title={`${h.session_date} - ${h.course_code}: ${h.status}`}
@@ -576,7 +577,7 @@ export function StudentPortal() {
                     <p className="text-xs text-[#64708A]">Courses with grade F or absent. Register directly for upcoming scheduled re-exams.</p>
                   </div>
 
-                  {data.length === 0 ? (
+                  {(!data || !Array.isArray(data) || data.length === 0) ? (
                     <div className="card p-8 text-center text-xs text-[#64708A]">
                       <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                       <p className="font-bold text-emerald-600 text-sm">No Pending Arrears</p>
@@ -596,7 +597,7 @@ export function StudentPortal() {
                           </tr>
                         </thead>
                         <tbody>
-                          {data.map((a: any) => (
+                          {(Array.isArray(data) ? data : []).map((a: any) => (
                             <tr key={a.id}>
                               <td className="font-mono font-bold text-rose-600">{a.course_code}</td>
                               <td className="font-semibold">{a.course_name}</td>

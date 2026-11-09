@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Users, UserCheck, BookOpen, Calendar, DollarSign,
   AlertTriangle, Bell, FileText, Settings, ShieldAlert, Plus, Eye,
   CheckCircle, ArrowUpRight, Search, Download, Lock, Unlock, ChevronRight,
-  LogOut, Menu, X, Edit, Trash2, Key, Clock, BarChart2
+  LogOut, Menu, X, Edit, Trash2, Key, Clock, BarChart2, Filter, ChevronLeft,
+  RefreshCw, SlidersHorizontal, ArrowUpDown
 } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { api, clearAuth } from "./api";
@@ -93,18 +94,69 @@ export function AdminPortal() {
     targetType: "ALL"
   });
 
+  // Search & Filter State for 9000 Students Directory
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedYearOfStudy, setSelectedYearOfStudy] = useState<string>("ALL"); // "ALL", "1", "2", "3", "4", "GRADUATED"
+  const [selectedGender, setSelectedGender] = useState<string>("ALL"); // "ALL", "MALE", "FEMALE"
+  const [selectedDept, setSelectedDept] = useState<string>("ALL");
+  const [selectedSem, setSelectedSem] = useState<string>("ALL");
+  const [selectedCgpa, setSelectedCgpa] = useState<string>("ALL");
+  const [selectedAtt, setSelectedAtt] = useState<string>("ALL");
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [studentPage, setStudentPage] = useState<number>(1);
+  const [studentPageSize, setStudentPageSize] = useState<number>(20);
+  const [studentSortBy, setStudentSortBy] = useState<string>("id");
+  const [studentSortDir, setStudentSortDir] = useState<string>("desc");
+  const [studentDepartments, setStudentDepartments] = useState<any[]>([]);
+
   useEffect(() => {
     loadTab(tab);
   }, [tab]);
 
-  async function loadTab(t: string) {
+  async function loadTab(t: string, overrides: any = {}) {
     setLoading(true);
     try {
       if (t === "dashboard") {
         const res = await api.admin.getDashboard();
         setData(res);
       } else if (t === "students") {
-        const res = await api.admin.getStudents();
+        if (studentDepartments.length === 0) {
+          api.admin.getDepartments().then((depts: any) => {
+            if (Array.isArray(depts)) setStudentDepartments(depts);
+          }).catch(() => {});
+        }
+
+        const p = overrides.page !== undefined ? overrides.page : studentPage;
+        const sz = overrides.size !== undefined ? overrides.size : studentPageSize;
+        const sb = overrides.sortBy !== undefined ? overrides.sortBy : studentSortBy;
+        const sd = overrides.sortDir !== undefined ? overrides.sortDir : studentSortDir;
+        const s = overrides.search !== undefined ? overrides.search : studentSearch;
+        const y = overrides.yearOfStudy !== undefined ? overrides.yearOfStudy : selectedYearOfStudy;
+        const g = overrides.gender !== undefined ? overrides.gender : selectedGender;
+        const d = overrides.dept !== undefined ? overrides.dept : selectedDept;
+        const sem = overrides.sem !== undefined ? overrides.sem : selectedSem;
+        const cg = overrides.cgpa !== undefined ? overrides.cgpa : selectedCgpa;
+        const att = overrides.att !== undefined ? overrides.att : selectedAtt;
+        const st = overrides.status !== undefined ? overrides.status : selectedStatus;
+
+        const params: any = { page: p, size: sz, sortBy: sb, sortDir: sd };
+        if (s && s.trim()) params.search = s.trim();
+        if (y && y !== "ALL") {
+          if (y === "GRADUATED") params.status = "GRADUATED";
+          else params.yearOfStudy = Number(y);
+        }
+        if (g && g !== "ALL") params.gender = g;
+        if (d && d !== "ALL") params.departmentId = Number(d);
+        if (sem && sem !== "ALL") params.semester = Number(sem);
+        if (st && st !== "ALL" && y !== "GRADUATED") params.status = st;
+        if (att && att !== "ALL") params.attendanceFilter = att;
+
+        if (cg === "TOP_9") params.minCgpa = 9.0;
+        else if (cg === "FIRST_8") { params.minCgpa = 8.0; params.maxCgpa = 8.99; }
+        else if (cg === "SECOND_7") { params.minCgpa = 7.0; params.maxCgpa = 7.99; }
+        else if (cg === "BELOW_7") { params.maxCgpa = 6.99; }
+
+        const res = await api.admin.getStudents(params);
         setData(res);
       } else if (t === "faculty") {
         const res = await api.admin.getFaculty();
@@ -121,11 +173,12 @@ export function AdminPortal() {
         setData({ depts, progs, courses });
       } else if (t === "timetable") {
         const sections = await api.admin.getSections();
-        setSectionsList(sections);
-        const secId = selectedSectionId || (sections[0]?.id ?? 1);
+        const secArr = Array.isArray(sections) ? sections : [];
+        setSectionsList(secArr);
+        const secId = selectedSectionId || (secArr[0]?.id ?? 1);
         setSelectedSectionId(secId);
         const tt = await api.admin.getTimetable(secId);
-        setData({ sections, timetable: tt, sectionId: secId });
+        setData({ sections: secArr, timetable: tt, sectionId: secId });
       } else if (t === "assignments") {
         const res = await api.admin.getAssignments();
         setData(res);
@@ -152,6 +205,54 @@ export function AdminPortal() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleFilterChange(updates: any) {
+    if (updates.page === undefined) {
+      updates.page = 1;
+      setStudentPage(1);
+    }
+    if (updates.search !== undefined) setStudentSearch(updates.search);
+    if (updates.yearOfStudy !== undefined) setSelectedYearOfStudy(updates.yearOfStudy);
+    if (updates.gender !== undefined) setSelectedGender(updates.gender);
+    if (updates.dept !== undefined) setSelectedDept(updates.dept);
+    if (updates.sem !== undefined) setSelectedSem(updates.sem);
+    if (updates.cgpa !== undefined) setSelectedCgpa(updates.cgpa);
+    if (updates.att !== undefined) setSelectedAtt(updates.att);
+    if (updates.status !== undefined) setSelectedStatus(updates.status);
+    if (updates.size !== undefined) setStudentPageSize(updates.size);
+    if (updates.sortBy !== undefined) setStudentSortBy(updates.sortBy);
+    if (updates.sortDir !== undefined) setStudentSortDir(updates.sortDir);
+    if (updates.page !== undefined) setStudentPage(updates.page);
+
+    loadTab("students", updates);
+  }
+
+  function resetAllStudentFilters() {
+    setStudentSearch("");
+    setSelectedYearOfStudy("ALL");
+    setSelectedGender("ALL");
+    setSelectedDept("ALL");
+    setSelectedSem("ALL");
+    setSelectedCgpa("ALL");
+    setSelectedAtt("ALL");
+    setSelectedStatus("ALL");
+    setStudentPage(1);
+    setStudentSortBy("id");
+    setStudentSortDir("desc");
+    loadTab("students", {
+      search: "",
+      yearOfStudy: "ALL",
+      gender: "ALL",
+      dept: "ALL",
+      sem: "ALL",
+      cgpa: "ALL",
+      att: "ALL",
+      status: "ALL",
+      page: 1,
+      sortBy: "id",
+      sortDir: "desc"
+    });
   }
 
   async function handleCreateStudent(e: React.FormEvent) {
@@ -496,30 +597,266 @@ export function AdminPortal() {
                 </div>
               )}
 
-              {/* 5.2 STUDENTS TAB */}
+              {/* 5.2 STUDENTS TAB - ADVANCED SEARCH ENGINE & DIRECTORY */}
               {tab === "students" && data && (
                 <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  {/* Top Bar with Metrics and Action Button */}
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-[#11162A] p-5 rounded-2xl border border-[#E5E8F0] dark:border-[#1F293D] shadow-sm">
                     <div>
-                      <h2 className="text-base font-bold text-[#0B1020] dark:text-white">Enrolled Students ({data.total || 0})</h2>
-                      <p className="text-xs text-[#64708A]">Comprehensive student directory with atomic ID generation & encryption</p>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-lg font-bold text-[#0B1020] dark:text-white">
+                          Enrolled Students ({Number(data.total || 0).toLocaleString()})
+                        </h2>
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                          Live Database: 9,000 Enrolled
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#64708A] mt-0.5">
+                        High-performance search & multi-dimensional filtering across all 4 study years (2015–2026)
+                      </p>
                     </div>
-                    <button
-                      onClick={() => setStudentModal(true)}
-                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-2 transition"
-                    >
-                      <Plus className="w-4 h-4" /> Enroll New Student
-                    </button>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(studentSearch || selectedYearOfStudy !== "ALL" || selectedGender !== "ALL" || selectedDept !== "ALL" || selectedSem !== "ALL" || selectedCgpa !== "ALL" || selectedAtt !== "ALL" || selectedStatus !== "ALL") && (
+                        <button
+                          onClick={resetAllStudentFilters}
+                          className="px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold text-xs flex items-center gap-1.5 transition hover:bg-rose-100"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Reset Filters
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setStudentModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-2 transition"
+                      >
+                        <Plus className="w-4 h-4" /> Enroll New Student
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="table-container">
+                  {/* Search Engine Filter Console */}
+                  <div className="card p-5 space-y-4">
+                    {/* Row 1: Search Bar & Year Selector Tabs */}
+                    <div className="flex flex-col lg:flex-row gap-3">
+                      {/* Search Input */}
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Search engine: Type student name, registration number, roll no, or phone..."
+                          value={studentSearch}
+                          onChange={(e) => {
+                            setStudentSearch(e.target.value);
+                            handleFilterChange({ search: e.target.value, page: 1 });
+                          }}
+                          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition outline-none"
+                        />
+                        {studentSearch && (
+                          <button
+                            onClick={() => {
+                              setStudentSearch("");
+                              handleFilterChange({ search: "", page: 1 });
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Year of Study Chips */}
+                      <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                        {[
+                          { id: "ALL", label: "All Years" },
+                          { id: "1", label: "1st Year (2026)" },
+                          { id: "2", label: "2nd Year (2025)" },
+                          { id: "3", label: "3rd Year (2024)" },
+                          { id: "4", label: "4th Year (2023)" },
+                          { id: "GRADUATED", label: "Graduated" }
+                        ].map((yr) => (
+                          <button
+                            key={yr.id}
+                            onClick={() => {
+                              setSelectedYearOfStudy(yr.id);
+                              handleFilterChange({ yearOfStudy: yr.id, page: 1 });
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                              selectedYearOfStudy === yr.id
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                            }`}
+                          >
+                            {yr.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Row 2: Secondary Dropdown Filters */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 pt-1 border-t border-[#E5E8F0] dark:border-[#1F293D]/60">
+                      {/* Gender Filter */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#64708A] uppercase mb-1">Gender</label>
+                        <select
+                          value={selectedGender}
+                          onChange={(e) => {
+                            setSelectedGender(e.target.value);
+                            handleFilterChange({ gender: e.target.value, page: 1 });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-semibold outline-none"
+                        >
+                          <option value="ALL">All Genders</option>
+                          <option value="MALE">👨 Boys / Male</option>
+                          <option value="FEMALE">👩 Girls / Female</option>
+                        </select>
+                      </div>
+
+                      {/* Department Filter */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#64708A] uppercase mb-1">Department</label>
+                        <select
+                          value={selectedDept}
+                          onChange={(e) => {
+                            setSelectedDept(e.target.value);
+                            handleFilterChange({ dept: e.target.value, page: 1 });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-semibold outline-none"
+                        >
+                          <option value="ALL">All Departments</option>
+                          {studentDepartments.map((d: any) => (
+                            <option key={d.id} value={d.id}>{d.code || d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Semester Filter */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#64708A] uppercase mb-1">Semester</label>
+                        <select
+                          value={selectedSem}
+                          onChange={(e) => {
+                            setSelectedSem(e.target.value);
+                            handleFilterChange({ sem: e.target.value, page: 1 });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-semibold outline-none"
+                        >
+                          <option value="ALL">All Semesters</option>
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                            <option key={s} value={s}>Semester {s}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* CGPA Range Filter */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#64708A] uppercase mb-1">CGPA Range</label>
+                        <select
+                          value={selectedCgpa}
+                          onChange={(e) => {
+                            setSelectedCgpa(e.target.value);
+                            handleFilterChange({ cgpa: e.target.value, page: 1 });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-semibold outline-none"
+                        >
+                          <option value="ALL">All CGPA</option>
+                          <option value="TOP_9">≥ 9.0 (Outstanding)</option>
+                          <option value="FIRST_8">8.0 – 8.99 (Distinction)</option>
+                          <option value="SECOND_7">7.0 – 7.99 (First Class)</option>
+                          <option value="BELOW_7">&lt; 7.0 (Needs Support)</option>
+                        </select>
+                      </div>
+
+                      {/* Attendance Filter */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#64708A] uppercase mb-1">Attendance</label>
+                        <select
+                          value={selectedAtt}
+                          onChange={(e) => {
+                            setSelectedAtt(e.target.value);
+                            handleFilterChange({ att: e.target.value, page: 1 });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-semibold outline-none"
+                        >
+                          <option value="ALL">All Attendance</option>
+                          <option value="GOOD">Eligible (≥ 75%)</option>
+                          <option value="LOW">Shortage (&lt; 75%)</option>
+                        </select>
+                      </div>
+
+                      {/* Sort By Filter */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#64708A] uppercase mb-1">Sort By</label>
+                        <select
+                          value={`${studentSortBy}-${studentSortDir}`}
+                          onChange={(e) => {
+                            const [sb, sd] = e.target.value.split("-");
+                            setStudentSortBy(sb);
+                            setStudentSortDir(sd);
+                            handleFilterChange({ sortBy: sb, sortDir: sd, page: 1 });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] text-xs font-semibold outline-none"
+                        >
+                          <option value="id-desc">Latest Registered</option>
+                          <option value="name-asc">Name (A → Z)</option>
+                          <option value="cgpa-desc">Highest CGPA</option>
+                          <option value="cgpa-asc">Lowest CGPA</option>
+                          <option value="attendance-desc">Highest Attendance</option>
+                          <option value="attendance-asc">Lowest Attendance</option>
+                          <option value="regno-asc">Registration No</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Quick Stats Pill Strip */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#E5E8F0] dark:border-[#1F293D]/60 text-xs">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          Matching: <b className="font-mono text-indigo-600 dark:text-indigo-400">{Number(data.total || 0).toLocaleString()}</b>
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          👨 Boys: <b className="font-mono text-blue-600 dark:text-blue-400">{Number(data.maleCount || 0).toLocaleString()}</b>
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          👩 Girls: <b className="font-mono text-pink-600 dark:text-pink-400">{Number(data.femaleCount || 0).toLocaleString()}</b>
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Avg CGPA: <b className="font-mono text-emerald-600 dark:text-emerald-400">{data.avgCgpa || "0.00"}</b>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-[#64708A]">
+                        <span>Rows per page:</span>
+                        <select
+                          value={studentPageSize}
+                          onChange={(e) => {
+                            const newSz = Number(e.target.value);
+                            setStudentPageSize(newSz);
+                            handleFilterChange({ size: newSz, page: 1 });
+                          }}
+                          className="px-2 py-1 rounded border border-[#E5E8F0] dark:border-[#1F293D] bg-white dark:bg-[#0B1020] font-mono font-bold"
+                        >
+                          <option value={15}>15</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Student Records Table */}
+                  <div className="table-container shadow-sm">
                     <table>
                       <thead>
                         <tr>
                           <th>Registration No</th>
-                          <th>Full Name</th>
+                          <th>Full Name & Gender</th>
+                          <th>Year & Semester</th>
                           <th>Department</th>
-                          <th>Semester</th>
+                          <th>Phone</th>
                           <th>CGPA</th>
                           <th>Attendance</th>
                           <th>Status</th>
@@ -527,52 +864,146 @@ export function AdminPortal() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(data.items || []).map((s: any) => (
-                          <tr key={s.id}>
-                            <td className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{s.registration_number}</td>
-                            <td className="font-semibold text-[#0B1020] dark:text-white">{s.full_name}</td>
-                            <td>{s.department_code || "CSE"}</td>
-                            <td>Sem {s.current_semester}</td>
-                            <td className="font-mono font-bold">{s.current_cgpa || "0.00"}</td>
-                            <td>
-                              <Badge
-                                label={`${s.attendance_percentage || 100}%`}
-                                variant={Number(s.attendance_percentage) < 75 ? "danger" : "success"}
-                              />
-                            </td>
-                            <td><Badge label={s.status} variant={s.status === "ACTIVE" ? "success" : "default"} /></td>
-                            <td>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={async () => {
-                                    const detail = await api.admin.getStudentDetail(s.id);
-                                    setStudentDetail(detail);
-                                  }}
-                                  className="px-2 py-1 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] text-[11px] font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 transition"
-                                >
-                                  View
-                                </button>
-                                <button
-                                  onClick={() => setEditStudentModal(s)}
-                                  className="p-1 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] text-slate-500 hover:text-indigo-600"
-                                  title="Edit student"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteStudent(s.id, s.full_name)}
-                                  className="p-1 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] text-slate-500 hover:text-rose-600"
-                                  title="Deactivate student"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                        {(data.items || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="text-center py-10 text-xs text-[#64708A]">
+                              No students match the selected search & filter criteria.
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          (data.items || []).map((s: any) => {
+                            const isMale = String(s.gender).toUpperCase() === "MALE";
+                            const cgpaNum = Number(s.current_cgpa || 0);
+                            const attNum = Number(s.attendance_percentage || 0);
+                            const yLabel = s.current_year_of_study === 1 ? "1st Year"
+                              : s.current_year_of_study === 2 ? "2nd Year"
+                              : s.current_year_of_study === 3 ? "3rd Year"
+                              : s.current_year_of_study === 4 ? "4th Year"
+                              : `${s.admission_year} Batch`;
+
+                            return (
+                              <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                                <td className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                  <div>{s.registration_number}</div>
+                                  <div className="text-[10px] text-[#64708A] font-normal">{s.roll_number}</div>
+                                </td>
+                                <td>
+                                  <div className="font-semibold text-[#0B1020] dark:text-white flex items-center gap-1.5">
+                                    <span>{s.full_name}</span>
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                        isMale
+                                          ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                                          : "bg-pink-50 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300"
+                                      }`}
+                                    >
+                                      {isMale ? "👨 Boy" : "👩 Girl"}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-[#64708A] font-mono">{s.college_email}</div>
+                                </td>
+                                <td>
+                                  <span className="font-medium text-[#0B1020] dark:text-white text-xs">{yLabel}</span>
+                                  <div className="text-[10px] text-[#64708A]">Sem {s.current_semester}</div>
+                                </td>
+                                <td>
+                                  <span className="px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                    {s.department_code || "CSE"}
+                                  </span>
+                                </td>
+                                <td className="font-mono text-xs">{s.phone}</td>
+                                <td>
+                                  <span
+                                    className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
+                                      cgpaNum >= 9.0
+                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                        : cgpaNum >= 8.0
+                                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                        : cgpaNum >= 7.0
+                                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                                        : "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                                    }`}
+                                  >
+                                    {s.current_cgpa || "0.00"}
+                                  </span>
+                                </td>
+                                <td>
+                                  <Badge
+                                    label={`${s.attendance_percentage || 100}%`}
+                                    variant={attNum < 75 ? "danger" : "success"}
+                                  />
+                                </td>
+                                <td>
+                                  <Badge
+                                    label={s.status}
+                                    variant={s.status === "ACTIVE" ? "success" : s.status === "GRADUATED" ? "info" : "default"}
+                                  />
+                                </td>
+                                <td>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={async () => {
+                                        const detail = await api.admin.getStudentDetail(s.id);
+                                        setStudentDetail(detail);
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] text-[11px] font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 transition"
+                                    >
+                                      View
+                                    </button>
+                                    <button
+                                      onClick={() => setEditStudentModal(s)}
+                                      className="p-1 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] text-slate-500 hover:text-indigo-600"
+                                      title="Edit student"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteStudent(s.id, s.full_name)}
+                                      className="p-1 rounded-lg border border-[#E5E8F0] dark:border-[#1F293D] text-slate-500 hover:text-rose-600"
+                                      title="Deactivate student"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Pagination Bar */}
+                  {data.total > 0 && (
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-4 bg-white dark:bg-[#11162A] rounded-2xl border border-[#E5E8F0] dark:border-[#1F293D] text-xs">
+                      <div className="text-[#64708A]">
+                        Showing <b className="text-[#0B1020] dark:text-white font-mono">{((studentPage - 1) * studentPageSize) + 1}</b> to <b className="text-[#0B1020] dark:text-white font-mono">{Math.min(studentPage * studentPageSize, data.total)}</b> of <b className="text-[#0B1020] dark:text-white font-mono">{Number(data.total).toLocaleString()}</b> students
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={studentPage <= 1}
+                          onClick={() => handleFilterChange({ page: studentPage - 1 })}
+                          className="px-3 py-1.5 rounded-xl border border-[#E5E8F0] dark:border-[#1F293D] font-semibold flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                        </button>
+
+                        <span className="font-mono font-bold px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800">
+                          Page {studentPage} of {Math.max(1, Math.ceil((data.total || 0) / studentPageSize))}
+                        </span>
+
+                        <button
+                          disabled={studentPage >= Math.ceil((data.total || 0) / studentPageSize)}
+                          onClick={() => handleFilterChange({ page: studentPage + 1 })}
+                          className="px-3 py-1.5 rounded-xl border border-[#E5E8F0] dark:border-[#1F293D] font-semibold flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >
+                          Next <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -606,7 +1037,7 @@ export function AdminPortal() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(data || []).map((f: any) => (
+                        {(Array.isArray(data) ? data : (data?.faculty || data?.items || [])).map((f: any) => (
                           <tr key={f.id}>
                             <td className="font-mono font-bold text-teal-600 dark:text-teal-400">{f.employee_id}</td>
                             <td className="font-semibold text-[#0B1020] dark:text-white">{f.full_name}</td>
@@ -661,7 +1092,7 @@ export function AdminPortal() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(data || []).map((r: any) => (
+                        {(Array.isArray(data) ? data : (data?.runs || data?.items || [])).map((r: any) => (
                           <tr key={r.id}>
                             <td className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{r.month_year}</td>
                             <td className="font-mono">{r.faculty_count}</td>
@@ -778,7 +1209,8 @@ export function AdminPortal() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {daysOfWeek.map((dayName, idx) => {
                       const dayNum = idx + 1;
-                      const daySlots = (data.timetable || []).filter((s: any) => s.day_of_week === dayNum);
+                      const slots = Array.isArray(data?.timetable) ? data.timetable : (data?.timetable?.slots || []);
+                      const daySlots = slots.filter((s: any) => s.day_of_week === dayNum);
                       return (
                         <div key={dayName} className="card p-4 space-y-3">
                           <div className="flex justify-between items-center border-b border-[#E5E8F0] dark:border-[#1F293D] pb-2">
@@ -832,7 +1264,7 @@ export function AdminPortal() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.map((a: any) => (
+                        {(Array.isArray(data) ? data : (data?.assignments || data?.items || [])).map((a: any) => (
                           <tr key={a.id}>
                             <td className="font-mono font-bold text-indigo-600">{a.course_code}</td>
                             <td>Section {a.section_name}</td>
@@ -913,7 +1345,7 @@ export function AdminPortal() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(data || []).map((a: any) => (
+                        {(Array.isArray(data) ? data : (data?.arrears || data?.items || [])).map((a: any) => (
                           <tr key={a.id}>
                             <td className="font-semibold text-[#0B1020] dark:text-white">{a.full_name}</td>
                             <td className="font-mono font-bold text-rose-600 dark:text-rose-400">{a.registration_number}</td>
@@ -946,7 +1378,7 @@ export function AdminPortal() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(data || []).map((a: any) => (
+                    {(Array.isArray(data) ? data : (data?.announcements || data?.items || [])).map((a: any) => (
                       <div key={a.id} className="card p-5 space-y-3">
                         <div className="flex justify-between items-start">
                           <Badge label={a.priority} variant={a.priority === "URGENT" ? "danger" : "info"} />
@@ -1612,13 +2044,13 @@ export function AdminPortal() {
               </div>
 
               {/* Fees in detail modal */}
-              {studentDetail.fees && studentDetail.fees.length > 0 && (
+              {Array.isArray(studentDetail.fees) && studentDetail.fees.length > 0 && (
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="font-bold text-sm text-[#0B1020] dark:text-white">Fee Statements</h4>
                   </div>
                   <div className="space-y-2">
-                    {studentDetail.fees.map((fee: any) => (
+                    {(Array.isArray(studentDetail.fees) ? studentDetail.fees : []).map((fee: any) => (
                       <div key={fee.id} className="p-3 rounded-xl border border-[#E5E8F0] dark:border-[#1F293D] flex justify-between items-center text-xs">
                         <div>
                           <p className="font-semibold text-[#0B1020] dark:text-white">{fee.structure_name || "Tuition & Academics"}</p>
